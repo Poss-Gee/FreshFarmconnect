@@ -1,27 +1,21 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowUpRight, Search, PlusCircle } from 'lucide-react';
+import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical } from 'lucide-react';
 import { APPOINTMENTS, MOCK_USER } from '@/lib/mock-data';
-import type { UserRole } from '@/lib/types';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { appUser, loading } = useAuth();
-  // We'll use a local state for the toggle, but the actual role comes from appUser
-  const [viewAs, setViewAs] = useState<UserRole>('patient');
 
   const role = appUser?.role || 'patient';
-  const name = appUser?.fullName?.split(' ')[1] || 'User';
+  const name = appUser?.fullName?.split(' ')[0] || 'User';
 
   const upcomingAppointments = APPOINTMENTS.filter(
     (appt) => appt.status === 'upcoming' && (role === 'patient' ? appt.patient.id === 'user-001' : appt.doctor.id === 'doc-001')
@@ -40,16 +34,10 @@ export default function DashboardPage() {
           </h1>
           <p className="text-muted-foreground">Here&apos;s a summary of your activities.</p>
         </div>
-        {role === 'doctor' && (
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="role-switch">Patient View</Label>
-            <Switch id="role-switch" checked={viewAs === 'doctor'} onCheckedChange={(checked) => setViewAs(checked ? 'doctor' : 'patient')} />
-            <Label htmlFor="role-switch">Doctor View</Label>
-          </div>
-        )}
       </div>
       
-      {(role === 'patient' || (role === 'doctor' && viewAs === 'patient')) && <PatientDashboardContent />}
+      {role === 'patient' && <PatientDashboardContent />}
+      {role === 'doctor' && <DoctorDashboardContent />}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -88,7 +76,7 @@ export default function DashboardPage() {
                         </Avatar>
                         <div>
                           <p className="font-medium">{role === 'patient' ? appt.doctor.name : appt.patient.name}</p>
-                          <p className="text-sm text-muted-foreground">{role === 'patient' ? appt.doctor.specialty : ''}</p>
+                          {role === 'patient' && <p className="text-sm text-muted-foreground">{appt.doctor.specialty}</p>}
                         </div>
                       </div>
                     </TableCell>
@@ -119,7 +107,7 @@ function PatientDashboardContent() {
         <div className="grid md:grid-cols-2 gap-4">
             <Card className="bg-gradient-to-br from-primary/10 to-card">
                 <CardHeader>
-                    <CardTitle className="font-headline">Find a Doctor</CardTitle>
+                    <CardTitle className="font-headline flex items-center gap-2"><Stethoscope /> Find a Doctor</CardTitle>
                     <CardDescription>Search for a specialist for your needs.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -154,6 +142,54 @@ function PatientDashboardContent() {
     )
 }
 
+function DoctorDashboardContent() {
+  return (
+      <div className="grid md:grid-cols-3 gap-4">
+          <Card>
+              <CardHeader>
+                  <CardTitle className="font-headline flex items-center gap-2"><Users /> My Patients</CardTitle>
+                  <CardDescription>Overview of your patient list.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                   <p className="text-3xl font-bold">124</p>
+                   <p className="text-sm text-muted-foreground">+5 new this month</p>
+                   <Button className="mt-4 w-full" variant="outline" asChild>
+                      <Link href="/patients">
+                          View All Patients
+                      </Link>
+                  </Button>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader>
+                  <CardTitle className="font-headline flex items-center gap-2"><BriefcaseMedical /> Profile & Availability</CardTitle>
+                  <CardDescription>Manage your public profile and schedule.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                   <p className="text-muted-foreground">Keep your information up to date for patients.</p>
+                   <Button className="mt-4 w-full" variant="outline">
+                      Update Profile
+                  </Button>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader>
+                  <CardTitle className="font-headline flex items-center gap-2"><UserPlus /> New Patient Requests</CardTitle>
+                  <CardDescription>Respond to new appointment requests.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                    <p className="text-3xl font-bold">3</p>
+                    <p className="text-sm text-muted-foreground">Pending requests</p>
+                   <Button className="mt-4 w-full" variant="outline">
+                      Review Requests
+                  </Button>
+              </CardContent>
+          </Card>
+      </div>
+  )
+}
+
+
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-8">
@@ -161,11 +197,6 @@ function DashboardSkeleton() {
         <div>
           <Skeleton className="h-9 w-64 mb-2" />
           <Skeleton className="h-5 w-80" />
-        </div>
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-6 w-11 rounded-full" />
-          <Skeleton className="h-5 w-20" />
         </div>
       </div>
       <div className="grid md:grid-cols-2 gap-4">
@@ -202,3 +233,5 @@ function DashboardSkeleton() {
     </div>
   )
 }
+
+    
