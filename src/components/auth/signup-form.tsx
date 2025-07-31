@@ -68,9 +68,15 @@ export function SignupForm() {
 
     } catch (error: any) {
       console.error("Signup Error:", error);
+      let description = 'An unexpected error occurred.';
+      if (error.code === 'auth/email-already-in-use') {
+        description = 'This email is already registered. Please try logging in instead.';
+      } else if (error.message) {
+        description = error.message;
+      }
       toast({
         title: 'Signup Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
