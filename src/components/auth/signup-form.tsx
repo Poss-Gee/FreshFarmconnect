@@ -1,68 +1,153 @@
 'use client';
 
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { User, BriefcaseMedical } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+
+const formSchema = z.object({
+  fullName: z.string().min(2, { message: 'Full name must be at least 2 characters.' }),
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
+  role: z.enum(['patient', 'doctor'], { required_error: 'Please select a role.' }),
+});
 
 export function SignupForm() {
+  const { toast } = useToast();
+  const router = useRouter();
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+      role: 'patient',
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    console.log(values);
+    toast({
+      title: 'Account Created!',
+      description: "We've created your account for you.",
+    });
+    // In a real app, you'd handle signup logic here.
+    // For this prototype, we'll just redirect to the dashboard.
+    router.push('/dashboard');
+  }
+
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
         <CardDescription>Join eClinic GH to manage your health online.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="fullname">Full Name</Label>
-          <Input id="fullname" placeholder="Kwame Mensah" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="k.mensah@email.com" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" required />
-        </div>
-        <div className="space-y-3">
-            <Label>I am a...</Label>
-            <RadioGroup defaultValue="patient" className="grid grid-cols-2 gap-4">
-                <div>
-                    <RadioGroupItem value="patient" id="patient" className="peer sr-only" />
-                    <Label
-                        htmlFor="patient"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Kwame Mensah" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="k.mensah@email.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>I am a...</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="grid grid-cols-2 gap-4"
                     >
-                        <User className="mb-3 h-6 w-6" />
-                        Patient
-                    </Label>
-                </div>
-                <div>
-                    <RadioGroupItem value="doctor" id="doctor" className="peer sr-only" />
-                    <Label
-                        htmlFor="doctor"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                    >
-                        <BriefcaseMedical className="mb-3 h-6 w-6" />
-                        Doctor
-                    </Label>
-                </div>
-            </RadioGroup>
-        </div>
-        <Button type="submit" className="w-full">
-          Create Account
-        </Button>
-      </CardContent>
-       <CardFooter className="text-center text-sm">
+                      <FormItem>
+                        <FormControl>
+                          <RadioGroupItem value="patient" id="patient" className="peer sr-only" />
+                        </FormControl>
+                        <Label
+                          htmlFor="patient"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <User className="mb-3 h-6 w-6" />
+                          Patient
+                        </Label>
+                      </FormItem>
+                      <FormItem>
+                        <FormControl>
+                          <RadioGroupItem value="doctor" id="doctor" className="peer sr-only" />
+                        </FormControl>
+                        <Label
+                          htmlFor="doctor"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <BriefcaseMedical className="mb-3 h-6 w-6" />
+                          Doctor
+                        </Label>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full">
+              Create Account
+            </Button>
+          </CardContent>
+        </form>
+      </Form>
+      <CardFooter className="text-center text-sm">
         <p className="w-full">
-            Already have an account?{' '}
-            <Link href="/login" className="underline text-primary/80 hover:text-primary">
-                Log In
-            </Link>
+          Already have an account?{' '}
+          <Link href="/login" className="underline text-primary/80 hover:text-primary">
+            Log In
+          </Link>
         </p>
       </CardFooter>
     </Card>

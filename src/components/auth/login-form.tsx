@@ -5,51 +5,63 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useRouter } from 'next/navigation';
 
 export function LoginForm() {
+  const router = useRouter();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, you'd handle login logic here.
+    // For this prototype, we'll just redirect to the dashboard.
+    router.push('/dashboard');
+  };
+
   return (
     <Card className="shadow-2xl">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
-        <CardDescription>Enter your credentials to access your account</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="k.mensah@email.com" required />
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <Label htmlFor="password">Password</Label>
-            <Link href="#" className="ml-auto inline-block text-sm underline text-primary/80 hover:text-primary">
-              Forgot your password?
-            </Link>
+      <form onSubmit={handleSubmit}>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
+          <CardDescription>Enter your credentials to access your account</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" placeholder="k.mensah@email.com" required />
           </div>
-          <Input id="password" type="password" required />
-        </div>
-        <Button type="submit" className="w-full">
-          Log In
-        </Button>
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <Label htmlFor="password">Password</Label>
+              <Link href="#" className="ml-auto inline-block text-sm underline text-primary/80 hover:text-primary">
+                Forgot your password?
+              </Link>
+            </div>
+            <Input id="password" type="password" required />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+          <Button type="submit" className="w-full">
+            Log In
+          </Button>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+            </div>
           </div>
-        </div>
-        <Button variant="outline" className="w-full">
-          Google
-        </Button>
-      </CardContent>
-      <CardFooter className="text-center text-sm">
-        <p className="w-full">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="underline text-primary/80 hover:text-primary">
-                Sign up
-            </Link>
-        </p>
-      </CardFooter>
+          <Button variant="outline" className="w-full" type="button">
+            Google
+          </Button>
+        </CardContent>
+        <CardFooter className="text-center text-sm">
+          <p className="w-full">
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="underline text-primary/80 hover:text-primary">
+                  Sign up
+              </Link>
+          </p>
+        </CardFooter>
+      </form>
     </Card>
   );
 }
