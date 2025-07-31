@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Stethoscope,
   LayoutDashboard,
@@ -30,7 +30,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MOCK_USER } from '@/lib/mock-data';
+import { useAuth } from '@/hooks/use-auth';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 
 const patientNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -48,10 +50,19 @@ const doctorNavItems = [
 
 export default function Header() {
   const pathname = usePathname();
-  // In a real app, role would come from auth context
-  const role = pathname.startsWith('/doctor') ? 'doctor' : 'patient';
+  const router = useRouter();
+  const { appUser, loading } = useAuth();
+
+  const role = appUser?.role || 'patient';
   const navItems = role === 'doctor' ? doctorNavItems : patientNavItems;
-  const user = role === 'doctor' ? MOCK_USER.doctor : MOCK_USER.patient;
+  const userName = appUser?.fullName || 'User';
+  const userAvatar = appUser?.avatarUrl || '';
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
@@ -63,7 +74,7 @@ export default function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
-          <SheetTitle className="sr-only">Menu</SheetTitle>
+           <SheetTitle className="sr-only">Menu</SheetTitle>
           <SheetDescription className="sr-only">App navigation links</SheetDescription>
           <nav className="grid gap-6 text-lg font-medium">
             <Link
@@ -101,15 +112,16 @@ export default function Header() {
             variant="outline"
             size="icon"
             className="overflow-hidden rounded-full"
+            disabled={loading}
           >
             <Avatar>
-              <AvatarImage src={user.avatarUrl} alt={user.name} />
-              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              <AvatarImage src={userAvatar} alt={userName} />
+              <AvatarFallback>{userInitial}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
+          <DropdownMenuLabel>{userName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>
             <User className="mr-2 h-4 w-4" />
@@ -120,11 +132,9 @@ export default function Header() {
             Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-             <Link href="/">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-            </Link>
+          <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+             <LogOut className="mr-2 h-4 w-4" />
+             <span>Logout</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

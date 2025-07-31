@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Users,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 const patientNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -30,20 +31,10 @@ const doctorNavItems = [
     { href: '/patients', icon: Users, label: 'My Patients' },
 ]
 
-// This is a placeholder for a real role check
-const useUserRole = () => {
-    const pathname = usePathname();
-    if (pathname.includes('/appointments') || pathname.includes('/chat')) {
-        // Assume doctor for shared pages for demonstration
-        // in a real app, this would come from an auth context
-        return 'doctor';
-    }
-    return pathname.startsWith('/doctor') ? 'doctor' : 'patient';
-}
-
 export default function AppSidebar() {
   const pathname = usePathname();
-  const role = useUserRole();
+  const { appUser } = useAuth();
+  const role = appUser?.role || 'patient';
   const navItems = role === 'doctor' ? doctorNavItems : patientNavItems;
 
   return (

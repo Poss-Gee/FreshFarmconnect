@@ -13,8 +13,9 @@ import { User, BriefcaseMedical } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 
 const formSchema = z.object({
@@ -43,10 +44,19 @@ export function SignupForm() {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      
-      if (userCredential.user) {
-        await updateProfile(userCredential.user, {
+      const user = userCredential.user;
+
+      if (user) {
+        await updateProfile(user, {
           displayName: values.fullName,
+        });
+
+        // Store user role and additional info in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: values.email,
+          fullName: values.fullName,
+          role: values.role,
         });
       }
 

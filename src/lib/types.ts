@@ -8,6 +8,14 @@ export interface User {
   role: UserRole;
 }
 
+export interface AppUser {
+  uid: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  avatarUrl?: string;
+}
+
 export interface Doctor {
   id: string;
   name: string;
@@ -29,7 +37,7 @@ export interface Appointment {
 }
 
 export interface ChatContact {
-  id: string;
+  id:string;
   name: string;
   avatarUrl: string;
   lastMessage: string;

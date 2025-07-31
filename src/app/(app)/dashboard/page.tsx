@@ -12,32 +12,44 @@ import { APPOINTMENTS, MOCK_USER } from '@/lib/mock-data';
 import type { UserRole } from '@/lib/types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<UserRole>('patient');
-  const user = role === 'patient' ? MOCK_USER.patient : MOCK_USER.doctor;
+  const { appUser, loading } = useAuth();
+  // We'll use a local state for the toggle, but the actual role comes from appUser
+  const [viewAs, setViewAs] = useState<UserRole>('patient');
+
+  const role = appUser?.role || 'patient';
+  const name = appUser?.fullName?.split(' ')[1] || 'User';
 
   const upcomingAppointments = APPOINTMENTS.filter(
-    (appt) => appt.status === 'upcoming' && (role === 'patient' ? appt.patient.id === user.id : appt.doctor.id === user.id)
+    (appt) => appt.status === 'upcoming' && (role === 'patient' ? appt.patient.id === 'user-001' : appt.doctor.id === 'doc-001')
   );
+  
+  if (loading) {
+    return <DashboardSkeleton />
+  }
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-headline">
-            Welcome back, {role === 'doctor' ? 'Dr.' : ''} {user.name.split(' ')[1]}!
+            Welcome back, {role === 'doctor' ? 'Dr.' : ''} {name}!
           </h1>
           <p className="text-muted-foreground">Here&apos;s a summary of your activities.</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="role-switch">Patient View</Label>
-          <Switch id="role-switch" checked={role === 'doctor'} onCheckedChange={(checked) => setRole(checked ? 'doctor' : 'patient')} />
-          <Label htmlFor="role-switch">Doctor View</Label>
-        </div>
+        {role === 'doctor' && (
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="role-switch">Patient View</Label>
+            <Switch id="role-switch" checked={viewAs === 'doctor'} onCheckedChange={(checked) => setViewAs(checked ? 'doctor' : 'patient')} />
+            <Label htmlFor="role-switch">Doctor View</Label>
+          </div>
+        )}
       </div>
       
-      {role === 'patient' && <PatientDashboardContent />}
+      {(role === 'patient' || (role === 'doctor' && viewAs === 'patient')) && <PatientDashboardContent />}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -140,4 +152,53 @@ function PatientDashboardContent() {
             </Card>
         </div>
     )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-9 w-64 mb-2" />
+          <Skeleton className="h-5 w-80" />
+        </div>
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-6 w-11 rounded-full" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-7 w-32 mb-2" />
+            <Skeleton className="h-5 w-48" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-10 w-full mb-4" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-7 w-32 mb-2" />
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-5 w-64 mb-4" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader>
+           <Skeleton className="h-7 w-48 mb-2" />
+           <Skeleton className="h-5 w-56" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-40 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
