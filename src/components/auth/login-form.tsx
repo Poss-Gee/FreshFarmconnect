@@ -6,15 +6,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 export function LoginForm() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you'd handle login logic here.
-    // For this prototype, we'll just redirect to the dashboard.
-    router.push('/dashboard');
+    setIsLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back!',
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      toast({
+        title: 'Login Failed',
+        description: error.message || 'Invalid credentials. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -27,7 +50,15 @@ export function LoginForm() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="k.mensah@email.com" required />
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="k.mensah@email.com" 
+              required 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+            />
           </div>
           <div className="space-y-2">
             <div className="flex items-center">
@@ -36,10 +67,17 @@ export function LoginForm() {
                 Forgot your password?
               </Link>
             </div>
-            <Input id="password" type="password" required />
+            <Input 
+              id="password" 
+              type="password" 
+              required 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+            />
           </div>
-          <Button type="submit" className="w-full">
-            Log In
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Logging In...' : 'Log In'}
           </Button>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -49,7 +87,7 @@ export function LoginForm() {
               <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
-          <Button variant="outline" className="w-full" type="button">
+          <Button variant="outline" className="w-full" type="button" disabled={isLoading}>
             Google
           </Button>
         </CardContent>
