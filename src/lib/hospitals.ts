@@ -1,0 +1,15 @@
+export const GHANA_HOSPITALS = [
+  { name: 'Korle-Bu Teaching Hospital', location: 'Accra' },
+  { name: 'Komfo Anokye Teaching Hospital', location: 'Kumasi' },
+  { name: '37 Military Hospital', location: 'Accra' },
+  { name: 'Tamale Teaching Hospital', location: 'Tamale' },
+  { name: 'Cape Coast Teaching Hospital', location: 'Cape Coast' },
+  { name: 'Greater Accra Regional Hospital (Ridge)', location: 'Accra' },
+  { name: 'Effia Nkwanta Regional Hospital', location: 'Sekondi-Takoradi' },
+  { name: 'Ho Teaching Hospital', location: 'Ho' },
+  { name: 'Sunyani Regional Hospital', location: 'Sunyani' },
+  { name: 'Koforidua Regional Hospital', location: 'Koforidua' },
+  { name: 'The Trust Hospital', location: 'Accra' },
+  { name: 'Nyaho Medical Centre', location: 'Accra' },
+  { name: 'Akai House Clinic', location: 'Accra' },
+];

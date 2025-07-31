@@ -14,6 +14,9 @@ export interface AppUser {
   fullName: string;
   role: UserRole;
   avatarUrl?: string;
+  // Doctor-specific fields
+  doctorID?: string;
+  hospital?: string;
 }
 
 export interface Doctor {
@@ -24,6 +27,7 @@ export interface Doctor {
   bio: string;
   qualifications: string[];
   availability: Record<string, string[]>; // e.g. { '2023-10-26': ['09:00', '10:00'] }
+  hospital?: string;
 }
 
 export interface Appointment {

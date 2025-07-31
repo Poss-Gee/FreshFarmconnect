@@ -18,12 +18,24 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { GHANA_HOSPITALS } from '@/lib/hospitals';
 
 const formSchema = z.object({
   fullName: z.string().min(2, { message: 'Full name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Please enter a valid email address.' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
   role: z.enum(['patient', 'doctor'], { required_error: 'Please select a role.' }),
+  doctorID: z.string().optional(),
+  hospital: z.string().optional(),
+}).refine(data => {
+    if (data.role === 'doctor') {
+        return !!data.doctorID && !!data.hospital;
+    }
+    return true;
+}, {
+    message: 'Doctor ID and Hospital are required for doctors.',
+    path: ['doctorID'], // you can point to a specific field
 });
 
 export function SignupForm() {
@@ -41,6 +53,8 @@ export function SignupForm() {
     },
   });
 
+  const watchRole = form.watch('role');
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
@@ -51,14 +65,21 @@ export function SignupForm() {
         await updateProfile(user, {
           displayName: values.fullName,
         });
-
-        // Store user role and additional info in Firestore
-        await setDoc(doc(db, "users", user.uid), {
+        
+        const userData: any = {
           uid: user.uid,
           email: values.email,
           fullName: values.fullName,
           role: values.role,
-        });
+        };
+
+        if (values.role === 'doctor') {
+            userData.doctorID = values.doctorID;
+            userData.hospital = values.hospital;
+        }
+
+        // Store user role and additional info in Firestore
+        await setDoc(doc(db, "users", user.uid), userData);
       }
 
       toast({
@@ -94,45 +115,6 @@ export function SignupForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Kwame Mensah" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="k.mensah@email.com" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="role"
@@ -176,6 +158,88 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Kwame Mensah" {...field} disabled={isLoading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="k.mensah@email.com" {...field} disabled={isLoading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} disabled={isLoading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {watchRole === 'doctor' && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="doctorID"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Doctor ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="MDC/ID/12345" {...field} disabled={isLoading} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hospital"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hospital</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your primary hospital" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {GHANA_HOSPITALS.map(hospital => (
+                            <SelectItem key={hospital.name} value={hospital.name}>
+                              {hospital.name} ({hospital.location})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
