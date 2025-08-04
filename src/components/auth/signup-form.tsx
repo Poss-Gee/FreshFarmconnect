@@ -20,6 +20,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { GHANA_HOSPITALS } from '@/lib/hospitals';
+import { DOCTOR_SPECIALTIES } from '@/lib/specialties';
 
 const formSchema = z.object({
   fullName: z.string().min(2, { message: 'Full name must be at least 2 characters.' }),
@@ -28,14 +29,15 @@ const formSchema = z.object({
   role: z.enum(['patient', 'doctor'], { required_error: 'Please select a role.' }),
   doctorID: z.string().optional(),
   hospital: z.string().optional(),
+  specialty: z.string().optional(),
 }).refine(data => {
     if (data.role === 'doctor') {
-        return !!data.doctorID && !!data.hospital;
+        return !!data.doctorID && !!data.hospital && !!data.specialty;
     }
     return true;
 }, {
-    message: 'Doctor ID and Hospital are required for doctors.',
-    path: ['doctorID'], // you can point to a specific field
+    message: 'Doctor ID, Hospital, and Specialty are required for doctors.',
+    path: ['specialty'], // Point error to the last new field
 });
 
 export function SignupForm() {
@@ -76,6 +78,7 @@ export function SignupForm() {
         if (values.role === 'doctor') {
             userData.doctorID = values.doctorID;
             userData.hospital = values.hospital;
+            userData.specialty = values.specialty;
         }
 
         // Store user role and additional info in Firestore
@@ -229,6 +232,30 @@ export function SignupForm() {
                           {GHANA_HOSPITALS.map(hospital => (
                             <SelectItem key={hospital.name} value={hospital.name}>
                               {hospital.name} ({hospital.location})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="specialty"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specialty</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your specialty" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {DOCTOR_SPECIALTIES.map(specialty => (
+                            <SelectItem key={specialty} value={specialty}>
+                              {specialty}
                             </SelectItem>
                           ))}
                         </SelectContent>

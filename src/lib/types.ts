@@ -17,6 +17,7 @@ export interface AppUser {
   // Doctor-specific fields
   doctorID?: string;
   hospital?: string;
+  specialty?: string;
 }
 
 export interface Doctor {
