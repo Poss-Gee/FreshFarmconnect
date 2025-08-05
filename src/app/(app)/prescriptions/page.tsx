@@ -25,18 +25,23 @@ export default function PrescriptionsPage() {
         if (appUser) {
             const fetchPrescriptions = async () => {
                 setLoading(true);
+                // The orderBy clause combined with a where clause requires a composite index.
+                // To avoid this, we will sort the data on the client.
                 const prescriptionsQuery = query(
                     collection(db, 'prescriptions'),
-                    where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid),
-                    orderBy('createdAt', 'desc')
+                    where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
                 );
 
                 const querySnapshot = await getDocs(prescriptionsQuery);
                 const fetchedPrescriptions = querySnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data(),
-                    createdAt: new Date(doc.data().createdAt.seconds * 1000).toLocaleDateString()
-                } as Prescription));
+                    // Ensure createdAt is a Date object for sorting
+                    createdAt: doc.data().createdAt.toDate(),
+                } as any)) as Prescription[];
+
+                // Sort the prescriptions by date in descending order (newest first)
+                fetchedPrescriptions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
                 setPrescriptions(fetchedPrescriptions);
                 setLoading(false);
@@ -127,7 +132,7 @@ function PrescriptionsTable({ prescriptions, loading, role }: { prescriptions: P
                         <TableCell>
                             <Badge variant="outline">{p.medication}</Badge>
                         </TableCell>
-                        <TableCell>{p.createdAt}</TableCell>
+                        <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">{p.dosage}</TableCell>
                     </TableRow>
                 ))}

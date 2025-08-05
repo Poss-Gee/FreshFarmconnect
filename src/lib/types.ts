@@ -73,5 +73,5 @@ export interface Prescription {
   frequency: string;
   duration: string;
   notes?: string;
-  createdAt: string; // Stored as ISO string
+  createdAt: Date; // Stored as a Date object or Firestore Timestamp
 }
