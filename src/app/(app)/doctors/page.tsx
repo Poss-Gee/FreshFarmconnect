@@ -51,9 +51,9 @@ export default function DoctorsPage() {
         setDoctors(fetchedDoctors);
       } catch (err: any) {
           console.error("Error fetching users:", err);
-          let errorMessage = "Failed to fetch doctors. Please try again later.";
+          let errorMessage = "Failed to fetch doctors. This is likely a Firestore security rule issue. Please ensure your rules allow querying the 'users' collection for doctors.";
           if (err.code === 'permission-denied') {
-              errorMessage = "Failed to fetch doctors due to a permission error. Please ensure your Firestore security rules allow reading from the 'users' collection.";
+              errorMessage = "Failed to fetch doctors due to a permission error. This may happen if security rules do not allow listing all users. Please check the console for more details.";
           }
           setError(errorMessage);
       } finally {
@@ -122,7 +122,7 @@ export default function DoctorsPage() {
       ) : (
         <div className="text-center py-16">
           <p className="text-xl font-medium">No doctors found</p>
-          <p className="text-muted-foreground mt-2">There are currently no doctors with the role 'doctor' in the database. Please check your user data.</p>
+          <p className="text-muted-foreground mt-2">There are currently no users with the 'doctor' role in the database, or there was a problem fetching them.</p>
         </div>
       )}
     </div>
