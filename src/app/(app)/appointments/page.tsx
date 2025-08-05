@@ -1,15 +1,67 @@
+
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { APPOINTMENTS } from '@/lib/mock-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/hooks/use-auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Appointment } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AppointmentsPage() {
-  const upcomingAppointments = APPOINTMENTS.filter((appt) => appt.status === 'upcoming');
-  const pastAppointments = APPOINTMENTS.filter((appt) => appt.status === 'past');
+  const { appUser } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (appUser) {
+      const fetchAppointments = async () => {
+        setLoading(true);
+        const q = query(
+          collection(db, 'appointments'),
+          where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        const appts: Appointment[] = [];
+        const doctorPromises: Promise<any>[] = [];
+
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            const doctorRef = data.doctor.ref;
+             doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", doctorRef.id))).then(snap => {
+                const doctorData = snap.docs[0].data();
+                 const appointment: Appointment = {
+                    id: doc.id,
+                    patient: data.patient,
+                    doctor: {
+                        ...doctorData,
+                        id: doctorData.uid,
+                        name: doctorData.fullName,
+                    } as any,
+                    date: data.date,
+                    time: data.time,
+                    status: data.status,
+                    reason: data.reason
+                };
+                appts.push(appointment);
+            }))
+        });
+
+        await Promise.all(doctorPromises);
+        setAppointments(appts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        setLoading(false);
+      };
+      fetchAppointments();
+    }
+  }, [appUser]);
+
+  const upcomingAppointments = appointments.filter((appt) => appt.status === 'upcoming');
+  const pastAppointments = appointments.filter((appt) => appt.status === 'past');
 
   return (
     <div className="container mx-auto py-8">
@@ -26,7 +78,7 @@ export default function AppointmentsPage() {
               <CardDescription>Here are your scheduled appointments.</CardDescription>
             </CardHeader>
             <CardContent>
-              <AppointmentsTable appointments={upcomingAppointments} />
+              <AppointmentsTable appointments={upcomingAppointments} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -37,7 +89,7 @@ export default function AppointmentsPage() {
               <CardDescription>A history of your previous consultations.</CardDescription>
             </CardHeader>
             <CardContent>
-              <AppointmentsTable appointments={pastAppointments} />
+              <AppointmentsTable appointments={pastAppointments} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -46,7 +98,17 @@ export default function AppointmentsPage() {
   );
 }
 
-function AppointmentsTable({ appointments }: { appointments: typeof APPOINTMENTS }) {
+function AppointmentsTable({ appointments, loading }: { appointments: Appointment[], loading: boolean }) {
+    if (loading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+            </div>
+        )
+    }
+
     if (appointments.length === 0) {
         return <div className="text-center py-16 text-muted-foreground">No appointments in this category.</div>
     }

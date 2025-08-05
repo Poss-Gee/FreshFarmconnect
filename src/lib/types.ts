@@ -1,3 +1,4 @@
+
 export type UserRole = 'patient' | 'doctor';
 
 export interface User {
@@ -18,17 +19,14 @@ export interface AppUser {
   doctorID?: string;
   hospital?: string;
   specialty?: string;
+  bio?: string;
+  qualifications?: string[];
+  availability?: Record<string, string[]>;
 }
 
-export interface Doctor {
+export interface Doctor extends AppUser {
   id: string;
   name: string;
-  specialty: string;
-  avatarUrl: string;
-  bio: string;
-  qualifications: string[];
-  availability: Record<string, string[]>; // e.g. { '2023-10-26': ['09:00', '10:00'] }
-  hospital?: string;
 }
 
 export interface Appointment {

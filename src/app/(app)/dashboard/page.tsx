@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -7,22 +8,67 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical } from 'lucide-react';
-import { APPOINTMENTS, MOCK_USER } from '@/lib/mock-data';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect, useState } from 'react';
+import type { Appointment, AppUser } from '@/lib/types';
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function DashboardPage() {
   const { appUser, loading } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
 
   const role = appUser?.role || 'patient';
   const name = appUser?.fullName?.split(' ')[0] || 'User';
 
-  const upcomingAppointments = APPOINTMENTS.filter(
-    (appt) => appt.status === 'upcoming' && (role === 'patient' ? appt.patient.id === 'user-001' : appt.doctor.id === 'doc-001')
-  );
-  
+  useEffect(() => {
+    if (appUser) {
+      const fetchAppointments = async () => {
+        setAppointmentsLoading(true);
+        const q = query(
+          collection(db, 'appointments'),
+          where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid),
+          where('status', '==', 'upcoming'),
+          limit(3)
+        );
+        const querySnapshot = await getDocs(q);
+        const appts: Appointment[] = [];
+        const doctorPromises: Promise<any>[] = [];
+
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            const doctorRef = data.doctor.ref;
+             doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", doctorRef.id))).then(snap => {
+                const doctorData = snap.docs[0].data();
+                 const appointment: Appointment = {
+                    id: doc.id,
+                    patient: data.patient,
+                    doctor: {
+                        ...doctorData,
+                        id: doctorData.uid,
+                        name: doctorData.fullName,
+                    } as any,
+                    date: data.date,
+                    time: data.time,
+                    status: data.status,
+                    reason: data.reason
+                };
+                appts.push(appointment);
+            }))
+        });
+
+        await Promise.all(doctorPromises);
+        setAppointments(appts);
+        setAppointmentsLoading(false);
+      };
+      fetchAppointments();
+    }
+  }, [appUser, role]);
+
   if (loading) {
-    return <DashboardSkeleton />
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -35,7 +81,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">Here&apos;s a summary of your activities.</p>
         </div>
       </div>
-      
+
       {role === 'patient' && <PatientDashboardContent />}
       {role === 'doctor' && <DoctorDashboardContent />}
 
@@ -44,7 +90,7 @@ export default function DashboardPage() {
           <div className="grid gap-2">
             <CardTitle>Upcoming Appointments</CardTitle>
             <CardDescription>
-              You have {upcomingAppointments.length} appointments coming up.
+                {appointmentsLoading ? 'Loading...' : `You have ${appointments.length} appointments coming up.`}
             </CardDescription>
           </div>
           <Button asChild size="sm" className="gap-1">
@@ -65,8 +111,14 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {upcomingAppointments.length > 0 ? (
-                upcomingAppointments.slice(0, 3).map((appt) => (
+              {appointmentsLoading ? (
+                <TableRow>
+                    <TableCell colSpan={4} className="text-center h-24">
+                        <Skeleton className='w-full h-8' />
+                    </TableCell>
+                </TableRow>
+              ) : appointments.length > 0 ? (
+                appointments.map((appt) => (
                   <TableRow key={appt.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -233,5 +285,3 @@ function DashboardSkeleton() {
     </div>
   )
 }
-
-    

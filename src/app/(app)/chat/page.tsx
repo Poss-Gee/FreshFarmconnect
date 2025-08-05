@@ -1,23 +1,84 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Send, Smile } from 'lucide-react';
-import { CHAT_CONTACTS, CHAT_MESSAGES } from '@/lib/mock-data';
-import type { ChatContact, ChatMessage } from '@/lib/types';
+import type { ChatContact, ChatMessage, AppUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/hooks/use-auth';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ChatPage() {
-  const [selectedContact, setSelectedContact] = useState<ChatContact>(CHAT_CONTACTS[0]);
-  const [messages, setMessages] = useState<ChatMessage[]>(CHAT_MESSAGES[selectedContact.id]);
+  const { appUser } = useAuth();
+  const [contacts, setContacts] = useState<ChatContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedContact, setSelectedContact] = useState<ChatContact | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]); // Mock messages for now
+
+  useEffect(() => {
+    if (appUser) {
+      const fetchContacts = async () => {
+        setLoading(true);
+        // This is a simplified fetch. A real app would likely have a 'contacts' subcollection.
+        // For now, we fetch all other users to demonstrate.
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('uid', '!=', appUser.uid));
+        const querySnapshot = await getDocs(q);
+        const fetchedContacts: ChatContact[] = querySnapshot.docs.map(doc => {
+          const userData = doc.data() as AppUser;
+          return {
+            id: userData.uid,
+            name: userData.fullName,
+            avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
+            lastMessage: 'No messages yet...',
+            lastMessageTime: '',
+            unreadCount: 0,
+          };
+        });
+        setContacts(fetchedContacts);
+        if (fetchedContacts.length > 0) {
+          setSelectedContact(fetchedContacts[0]);
+        }
+        setLoading(false);
+      };
+
+      fetchContacts();
+    }
+  }, [appUser]);
 
   const handleSelectContact = (contact: ChatContact) => {
     setSelectedContact(contact);
-    setMessages(CHAT_MESSAGES[contact.id] || []);
+    // In a real app, you would fetch messages for this contact from Firestore
+    setMessages([]);
   };
+
+  if (loading || !selectedContact) {
+      return (
+        <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
+            <div className="flex flex-col border-r bg-card md:col-span-1 p-4 gap-4">
+                <Skeleton className="h-10 w-1/2" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+            </div>
+            <div className="md:col-span-2 xl:col-span-3 p-4 flex flex-col">
+                <Skeleton className="h-16 w-full mb-4" />
+                <div className="flex-1 space-y-4">
+                    <Skeleton className="h-16 w-3/4 self-end" />
+                    <Skeleton className="h-16 w-3/4 self-start" />
+                </div>
+                 <Skeleton className="h-16 w-full mt-4" />
+            </div>
+        </div>
+      )
+  }
 
   return (
     <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
@@ -33,7 +94,7 @@ export default function ChatPage() {
         </div>
         <ScrollArea className="flex-1">
           <div className="flex flex-col">
-            {CHAT_CONTACTS.map((contact) => (
+            {contacts.map((contact) => (
               <button
                 key={contact.id}
                 onClick={() => handleSelectContact(contact)}
@@ -74,7 +135,11 @@ export default function ChatPage() {
         </div>
         <ScrollArea className="flex-1 p-4 md:p-6">
           <div className="space-y-4">
-            {messages.map((message) => (
+             {messages.length === 0 ? (
+                <div className="text-center text-muted-foreground py-16">
+                    No messages yet. Start the conversation!
+                </div>
+            ) : messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
@@ -104,8 +169,8 @@ export default function ChatPage() {
                 </div>
                  {message.sender === 'me' && (
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={CHAT_CONTACTS[0].avatarUrl} />
-                    <AvatarFallback>U</AvatarFallback>
+                    <AvatarImage src={appUser?.avatarUrl || ''} />
+                    <AvatarFallback>{appUser?.fullName?.charAt(0)}</AvatarFallback>
                   </Avatar>
                 )}
               </div>

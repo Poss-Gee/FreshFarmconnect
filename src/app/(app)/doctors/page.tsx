@@ -1,22 +1,53 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DoctorCard } from '@/components/doctor-card';
-import { DOCTORS } from '@/lib/mock-data';
 import { Search } from 'lucide-react';
-
-const specialties = [...new Set(DOCTORS.map((d) => d.specialty))];
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Doctor } from '@/lib/types';
+import { DOCTOR_SPECIALTIES } from '@/lib/specialties';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DoctorsPage() {
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [specialty, setSpecialty] = useState('all');
 
-  const filteredDoctors = DOCTORS.filter((doctor) => {
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      setLoading(true);
+      const q = query(collection(db, 'users'), where('role', '==', 'doctor'));
+      const querySnapshot = await getDocs(q);
+      const fetchedDoctors = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          uid: data.uid,
+          name: data.fullName,
+          fullName: data.fullName,
+          email: data.email,
+          role: data.role,
+          specialty: data.specialty,
+          avatarUrl: data.avatarUrl || `https://placehold.co/128x128.png?text=${data.fullName.charAt(0)}`,
+          bio: data.bio || 'No biography provided.',
+        } as Doctor;
+      });
+      setDoctors(fetchedDoctors);
+      setLoading(false);
+    };
+
+    fetchDoctors();
+  }, []);
+
+  const filteredDoctors = doctors.filter((doctor) => {
     const matchesSearch =
       doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
+      (doctor.specialty && doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSpecialty = specialty === 'all' || doctor.specialty === specialty;
     return matchesSearch && matchesSpecialty;
   });
@@ -44,7 +75,7 @@ export default function DoctorsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Specialties</SelectItem>
-            {specialties.map((s) => (
+            {DOCTOR_SPECIALTIES.map((s) => (
               <SelectItem key={s} value={s}>
                 {s}
               </SelectItem>
@@ -53,7 +84,11 @@ export default function DoctorsPage() {
         </Select>
       </div>
 
-      {filteredDoctors.length > 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => <DoctorCardSkeleton key={i} />)}
+        </div>
+      ) : filteredDoctors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredDoctors.map((doctor) => (
             <DoctorCard key={doctor.id} doctor={doctor} />
@@ -67,4 +102,26 @@ export default function DoctorsPage() {
       )}
     </div>
   );
+}
+
+function DoctorCardSkeleton() {
+    return (
+        <Card className="flex flex-col overflow-hidden">
+            <CardHeader className="flex flex-row items-center gap-4 p-6">
+                <Skeleton className="h-16 w-16 rounded-full" />
+                <div className="space-y-2">
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-5 w-24" />
+                </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 flex-grow space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+            </CardContent>
+            <CardFooter className="p-6 pt-0">
+                <Skeleton className="h-10 w-full" />
+            </CardFooter>
+        </Card>
+    )
 }
