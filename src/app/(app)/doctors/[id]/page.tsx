@@ -27,8 +27,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-export default function DoctorProfilePage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function DoctorProfilePage({ params: { id } }: { params: { id: string } }) {
   const { appUser } = useAuth();
   const { toast } = useToast();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
