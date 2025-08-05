@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Send, Smile, Trash2 } from 'lucide-react';
+import { Search, Send, Trash2 } from 'lucide-react';
 import type { ChatContact, ChatMessage, AppUser, Appointment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -352,13 +352,10 @@ export default function ChatPage() {
               <form onSubmit={handleSendMessage} className="relative flex gap-2">
                 <Input 
                     placeholder="Type your message..." 
-                    className="flex-1 pr-20" 
+                    className="flex-1 pr-12" 
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                 />
-                 <Button type="button" size="icon" variant="ghost" className="absolute right-12 top-1/2 -translate-y-1/2">
-                    <Smile className="h-5 w-5 text-muted-foreground" />
-                </Button>
                 <Button type="submit" size="icon" variant="ghost" className="absolute right-2 top-1/2 -translate-y-1/2">
                     <Send className="h-5 w-5 text-muted-foreground" />
                 </Button>
