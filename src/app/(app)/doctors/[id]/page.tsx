@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -11,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Check, Stethoscope } from 'lucide-react';
 
 export default function DoctorProfilePage({ params }: { params: { id: string } }) {
-  const doctor = DOCTORS.find((d) => d.id === params.id);
+  const { id } = params;
+  const doctor = DOCTORS.find((d) => d.id === id);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date('2024-08-15'));
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
