@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -10,7 +10,7 @@ import type { ChatContact, ChatMessage, AppUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, getDoc, doc, onSnapshot, addDoc, serverTimestamp, orderBy, collectionGroup, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -19,14 +19,25 @@ export default function ChatPage() {
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<ChatContact | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]); // Mock messages for now
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current) {
+        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+      }
+    };
+    scrollToBottom();
+  }, [messages]);
+  
+  // Fetch contacts based on appointments
   useEffect(() => {
     if (appUser) {
       const fetchContacts = async () => {
         setLoading(true);
-        
-        // Fetch appointments to determine contacts
         const appointmentsQuery = query(
           collection(db, 'appointments'),
           where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
@@ -69,15 +80,64 @@ export default function ChatPage() {
 
       fetchContacts();
     }
-  }, [appUser, selectedContact]);
+  }, [appUser]);
+
+
+  // Listen for messages for the selected contact
+  useEffect(() => {
+    if (selectedContact && appUser) {
+      setLoadingMessages(true);
+      const chatId = [appUser.uid, selectedContact.id].sort().join('_');
+      const messagesQuery = query(collection(db, 'chats', chatId, 'messages'), orderBy('timestamp', 'asc'));
+
+      const unsubscribe = onSnapshot(messagesQuery, (querySnapshot) => {
+        const fetchedMessages: ChatMessage[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          fetchedMessages.push({
+            id: doc.id,
+            text: data.text,
+            timestamp: data.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '',
+            sender: data.senderId === appUser.uid ? 'me' : 'them',
+            senderId: data.senderId,
+          });
+        });
+        setMessages(fetchedMessages);
+        setLoadingMessages(false);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [selectedContact, appUser]);
+
 
   const handleSelectContact = (contact: ChatContact) => {
     setSelectedContact(contact);
-    // In a real app, you would fetch messages for this contact from Firestore
     setMessages([]);
   };
 
-  if (loading || (!selectedContact && contacts.length > 0)) {
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !appUser || !selectedContact) return;
+
+    const chatId = [appUser.uid, selectedContact.id].sort().join('_');
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+
+    try {
+      await addDoc(messagesRef, {
+        text: newMessage,
+        senderId: appUser.uid,
+        receiverId: selectedContact.id,
+        timestamp: serverTimestamp(),
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+
+  if (loading) {
       return (
         <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
             <div className="flex flex-col border-r bg-card md:col-span-1 p-4 gap-4">
@@ -99,7 +159,7 @@ export default function ChatPage() {
       )
   }
   
-  if (contacts.length === 0) {
+  if (contacts.length === 0 && !loading) {
       return (
           <div className="flex items-center justify-center h-[calc(100vh-theme(spacing.16))]">
               <div className="text-center">
@@ -166,9 +226,11 @@ export default function ChatPage() {
               </Avatar>
               <h2 className="text-xl font-semibold">{selectedContact.name}</h2>
             </div>
-            <ScrollArea className="flex-1 p-4 md:p-6">
+            <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollAreaRef}>
               <div className="space-y-4">
-                 {messages.length === 0 ? (
+                 {loadingMessages ? (
+                    <div className="text-center text-muted-foreground py-16">Loading messages...</div>
+                 ) : messages.length === 0 ? (
                     <div className="text-center text-muted-foreground py-16">
                         No messages yet. Start the conversation!
                     </div>
@@ -196,7 +258,7 @@ export default function ChatPage() {
                     >
                       <p>{message.text}</p>
                       <p className={cn(
-                          'text-xs mt-1',
+                          'text-xs mt-1 text-right',
                           message.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                       )}>{message.timestamp}</p>
                     </div>
@@ -211,16 +273,19 @@ export default function ChatPage() {
               </div>
             </ScrollArea>
             <div className="border-t bg-card p-4">
-              <form className="relative">
-                <Input placeholder="Type your message..." className="pr-20" />
-                <div className="absolute inset-y-0 right-0 flex items-center">
-                    <Button type="button" size="icon" variant="ghost">
-                        <Smile className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                    <Button type="submit" size="icon" variant="ghost">
-                        <Send className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                </div>
+              <form onSubmit={handleSendMessage} className="relative flex gap-2">
+                <Input 
+                    placeholder="Type your message..." 
+                    className="flex-1 pr-20" 
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                />
+                 <Button type="button" size="icon" variant="ghost" className="absolute right-12 top-1/2 -translate-y-1/2">
+                    <Smile className="h-5 w-5 text-muted-foreground" />
+                </Button>
+                <Button type="submit" size="icon" variant="ghost" className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <Send className="h-5 w-5 text-muted-foreground" />
+                </Button>
               </form>
             </div>
           </>

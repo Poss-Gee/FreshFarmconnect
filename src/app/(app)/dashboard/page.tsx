@@ -55,8 +55,8 @@ export default function DashboardPage() {
             
             const appointment: Appointment = {
                 id: doc.id,
-                patient: role === 'patient' ? data.patient : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
-                doctor: role === 'doctor' ? data.doctor : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
+                patient: role === 'patient' ? { ...appUser } as any : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
+                doctor: role === 'doctor' ? { ...appUser } as any : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
                 date: data.date,
                 time: data.time,
                 status: data.status,
@@ -259,8 +259,10 @@ function DoctorDashboardContent({ stats, loading }: { stats: { patientCount: num
               <CardContent>
                     {loading ? <Skeleton className="h-8 w-12 mb-1" /> : <p className="text-3xl font-bold">{stats.requestCount}</p>}
                     <p className="text-sm text-muted-foreground">Pending requests</p>
-                   <Button className="mt-4 w-full" variant="outline">
-                      Review Requests
+                   <Button className="mt-4 w-full" variant="outline" asChild>
+                      <Link href="/appointments?tab=pending">
+                          Review Requests
+                      </Link>
                   </Button>
               </CardContent>
           </Card>

@@ -8,10 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Appointment } from '@/lib/types';
+import type { Appointment, AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { Check, X } from 'lucide-react';
 
 export default function AppointmentsPage() {
   const { appUser } = useAuth();
@@ -20,55 +23,62 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     if (appUser) {
-      const fetchAppointments = async () => {
-        setLoading(true);
-        const q = query(
-          collection(db, 'appointments'),
-          where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const appts: Appointment[] = [];
-        const doctorPromises: Promise<any>[] = [];
+      setLoading(true);
+      const q = query(
+        collection(db, 'appointments'),
+        where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
+      );
 
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            const doctorRef = data.doctor.ref;
-             doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", doctorRef.id))).then(snap => {
-                const doctorData = snap.docs[0].data();
-                 const appointment: Appointment = {
-                    id: doc.id,
-                    patient: data.patient,
-                    doctor: {
-                        ...doctorData,
-                        id: doctorData.uid,
-                        name: doctorData.fullName,
-                    } as any,
+      const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+        const appts: Appointment[] = [];
+
+        const participantPromises = querySnapshot.docs.map(async (docSnap) => {
+            const data = docSnap.data();
+            const otherUserRole = appUser.role === 'patient' ? 'doctor' : 'patient';
+            const otherUserUID = data[otherUserRole].uid;
+            
+            const userDocRef = doc(db, 'users', otherUserUID);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if(userDocSnap.exists()) {
+                const otherUserData = userDocSnap.data() as AppUser;
+                const appointment: Appointment = {
+                    id: docSnap.id,
+                    patient: appUser.role === 'patient' ? { ...appUser, id: appUser.uid, name: appUser.fullName } as any : { ...otherUserData, id: otherUserData.uid, name: otherUserData.fullName } as any,
+                    doctor: appUser.role === 'doctor' ? { ...appUser, id: appUser.uid, name: appUser.fullName } as any : { ...otherUserData, id: otherUserData.uid, name: otherUserData.fullName } as any,
                     date: data.date,
                     time: data.time,
                     status: data.status,
-                    reason: data.reason
+                    reason: data.reason,
                 };
                 appts.push(appointment);
-            }))
+            }
         });
 
-        await Promise.all(doctorPromises);
+        await Promise.all(participantPromises);
+        
         setAppointments(appts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         setLoading(false);
-      };
-      fetchAppointments();
+      }, (error) => {
+        console.error("Error fetching appointments:", error);
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
     }
   }, [appUser]);
 
   const upcomingAppointments = appointments.filter((appt) => appt.status === 'upcoming');
   const pastAppointments = appointments.filter((appt) => appt.status === 'past');
+  const pendingAppointments = appointments.filter((appt) => appt.status === 'pending');
 
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6 font-headline">My Appointments</h1>
-      <Tabs defaultValue="upcoming">
-        <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+      <Tabs defaultValue="upcoming" className="w-full">
+        <TabsList className={`grid w-full ${appUser?.role === 'doctor' ? 'grid-cols-3 md:w-[600px]' : 'grid-cols-2 md:w-[400px]'}`}>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          {appUser?.role === 'doctor' && <TabsTrigger value="pending">Pending ({pendingAppointments.length})</TabsTrigger>}
           <TabsTrigger value="past">Past</TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">
@@ -78,10 +88,23 @@ export default function AppointmentsPage() {
               <CardDescription>Here are your scheduled appointments.</CardDescription>
             </CardHeader>
             <CardContent>
-              <AppointmentsTable appointments={upcomingAppointments} loading={loading} />
+              <AppointmentsTable appointments={upcomingAppointments} loading={loading} role={appUser?.role} />
             </CardContent>
           </Card>
         </TabsContent>
+         {appUser?.role === 'doctor' && (
+            <TabsContent value="pending">
+            <Card>
+                <CardHeader>
+                <CardTitle>Pending Requests</CardTitle>
+                <CardDescription>These patients have requested an appointment with you.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                <AppointmentsTable appointments={pendingAppointments} loading={loading} role={appUser?.role} isPending />
+                </CardContent>
+            </Card>
+            </TabsContent>
+        )}
         <TabsContent value="past">
           <Card>
             <CardHeader>
@@ -89,7 +112,7 @@ export default function AppointmentsPage() {
               <CardDescription>A history of your previous consultations.</CardDescription>
             </CardHeader>
             <CardContent>
-              <AppointmentsTable appointments={pastAppointments} loading={loading} />
+              <AppointmentsTable appointments={pastAppointments} loading={loading} role={appUser?.role} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -98,7 +121,27 @@ export default function AppointmentsPage() {
   );
 }
 
-function AppointmentsTable({ appointments, loading }: { appointments: Appointment[], loading: boolean }) {
+function AppointmentsTable({ appointments, loading, role, isPending = false }: { appointments: Appointment[], loading: boolean, role?: 'patient' | 'doctor', isPending?: boolean }) {
+    const { toast } = useToast();
+
+    const handleRequest = async (appointmentId: string, newStatus: 'upcoming' | 'past' | 'cancelled') => {
+        const appointmentRef = doc(db, 'appointments', appointmentId);
+        try {
+            await updateDoc(appointmentRef, { status: newStatus });
+            toast({
+                title: 'Request Updated',
+                description: `The appointment has been ${newStatus === 'upcoming' ? 'approved' : 'declined'}.`,
+            });
+        } catch (error) {
+            console.error("Error updating appointment status:", error);
+            toast({
+                title: 'Update Failed',
+                description: 'Could not update the appointment status. Please try again.',
+                variant: 'destructive',
+            });
+        }
+    };
+    
     if (loading) {
         return (
             <div className="space-y-4">
@@ -117,10 +160,10 @@ function AppointmentsTable({ appointments, loading }: { appointments: Appointmen
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Doctor</TableHead>
+          <TableHead>{role === 'patient' ? 'Doctor' : 'Patient'}</TableHead>
           <TableHead>Date & Time</TableHead>
           <TableHead>Reason</TableHead>
-          <TableHead className="text-right">Status</TableHead>
+          <TableHead className="text-right">{isPending ? 'Actions' : 'Status'}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -129,12 +172,12 @@ function AppointmentsTable({ appointments, loading }: { appointments: Appointmen
             <TableCell>
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage src={appt.doctor.avatarUrl} alt={appt.doctor.name} />
-                  <AvatarFallback>{appt.doctor.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={role === 'patient' ? appt.doctor.avatarUrl : appt.patient.avatarUrl} alt={role === 'patient' ? appt.doctor.name : appt.patient.name} />
+                  <AvatarFallback>{(role === 'patient' ? appt.doctor.name : appt.patient.name).charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">{appt.doctor.name}</p>
-                  <p className="text-sm text-muted-foreground">{appt.doctor.specialty}</p>
+                  <p className="font-medium">{role === 'patient' ? appt.doctor.name : appt.patient.name}</p>
+                   {role === 'patient' && <p className="text-sm text-muted-foreground">{appt.doctor.specialty}</p>}
                 </div>
               </div>
             </TableCell>
@@ -144,9 +187,23 @@ function AppointmentsTable({ appointments, loading }: { appointments: Appointmen
             </TableCell>
             <TableCell>{appt.reason}</TableCell>
             <TableCell className="text-right">
-              <Badge variant={appt.status === 'upcoming' ? 'default' : 'outline'} className="capitalize">
-                {appt.status}
-              </Badge>
+                {isPending ? (
+                    <div className="flex gap-2 justify-end">
+                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleRequest(appt.id, 'upcoming')}>
+                            <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => handleRequest(appt.id, 'cancelled')}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ) : (
+                    <Badge 
+                        variant={appt.status === 'upcoming' ? 'default' : (appt.status === 'pending' ? 'secondary' : 'outline')} 
+                        className="capitalize"
+                    >
+                        {appt.status}
+                    </Badge>
+                )}
             </TableCell>
           </TableRow>
         ))}

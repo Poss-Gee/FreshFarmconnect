@@ -53,6 +53,7 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   sender: 'me' | 'them';
+  senderId: string;
 }
 
 export interface ChatConversation {
