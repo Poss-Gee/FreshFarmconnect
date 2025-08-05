@@ -124,12 +124,14 @@ export default function Header() {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{userName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href="/profile">
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </Link>
-          </DropdownMenuItem>
+          {appUser?.role === 'doctor' && (
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href="/profile">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem>
             <Settings className="mr-2 h-4 w-4" />
             Settings
