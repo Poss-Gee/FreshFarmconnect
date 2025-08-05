@@ -7,10 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical, Sparkles, AlertCircle, BarChart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { Appointment } from '@/lib/types';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -18,17 +18,44 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { suggestSpecialist, SymptomCheckerOutput } from '@/ai/flows/symptom-checker-flow';
 import { useToast } from '@/hooks/use-toast';
+import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { format, getMonth } from 'date-fns';
 
+
+interface MonthlyAppointment {
+    month: string;
+    total: number;
+}
 
 export default function DashboardPage() {
   const { appUser, loading } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [stats, setStats] = useState({ patientCount: 0, requestCount: 0 });
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
 
   const role = appUser?.role || 'patient';
   const name = appUser?.fullName?.split(' ')[0] || 'User';
+  
+  const monthlyData = useMemo(() => {
+    if (role !== 'doctor' || allAppointments.length === 0) return [];
+    
+    const monthlyCounts: { [key: number]: number } = {};
+
+    allAppointments.forEach(appt => {
+        const month = getMonth(new Date(appt.date));
+        monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+    });
+
+    const data = Array.from({ length: 12 }, (_, i) => ({
+      month: format(new Date(2024, i, 1), 'MMM'),
+      total: monthlyCounts[i] || 0,
+    }));
+    
+    return data;
+  }, [allAppointments, role]);
 
   useEffect(() => {
     if (appUser) {
@@ -41,40 +68,48 @@ export default function DashboardPage() {
             where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
         );
 
-        // Fetch recent upcoming appointments
-        const upcomingQuery = query(
-            baseAppointmentsQuery,
-            where('status', '==', 'upcoming'),
-            limit(3)
-        );
-
-        const upcomingSnapshot = await getDocs(upcomingQuery);
-        const appts = upcomingSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as Appointment));
-
-        setAppointments(appts);
-        setAppointmentsLoading(false);
-
-        // Fetch stats for doctors
+        // Fetch all appointments for doctor stats, recent for patient/doctor list
         if (role === 'doctor') {
             const allAppointmentsSnapshot = await getDocs(baseAppointmentsQuery);
+            const allAppts = allAppointmentsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as Appointment));
+            setAllAppointments(allAppts);
+
             const patientIds = new Set<string>();
             let requestCount = 0;
-
-            allAppointmentsSnapshot.forEach(doc => {
-                const data = doc.data();
-                patientIds.add(data.patient.uid);
-                if (data.status === 'pending') {
-                    requestCount++;
-                }
+            allAppts.forEach(appt => {
+                patientIds.add(appt.patient.uid);
+                if (appt.status === 'pending') requestCount++;
             });
+
             setStats({ patientCount: patientIds.size, requestCount });
-            setStatsLoading(false);
+            
+            const upcomingAppts = allAppts
+                .filter(a => a.status === 'upcoming')
+                .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .slice(0,3);
+
+            setAppointments(upcomingAppts);
+
         } else {
-            setStatsLoading(false);
+             // Fetch recent upcoming appointments for patient
+            const upcomingQuery = query(
+                baseAppointmentsQuery,
+                where('status', '==', 'upcoming'),
+                limit(3)
+            );
+            const upcomingSnapshot = await getDocs(upcomingQuery);
+            const appts = upcomingSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as Appointment));
+            setAppointments(appts);
         }
+
+        setAppointmentsLoading(false);
+        setStatsLoading(false);
       };
       fetchDashboardData();
     }
@@ -96,7 +131,7 @@ export default function DashboardPage() {
       </div>
 
       {role === 'patient' && <PatientDashboardContent />}
-      {role === 'doctor' && <DoctorDashboardContent stats={stats} loading={statsLoading} />}
+      {role === 'doctor' && <DoctorDashboardContent stats={stats} loading={statsLoading} monthlyData={monthlyData} />}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -261,8 +296,9 @@ function SymptomCheckerCard() {
     );
 }
 
-function DoctorDashboardContent({ stats, loading }: { stats: { patientCount: number, requestCount: number }, loading: boolean }) {
+function DoctorDashboardContent({ stats, loading, monthlyData }: { stats: { patientCount: number, requestCount: number }, loading: boolean, monthlyData: MonthlyAppointment[] }) {
   return (
+    <>
       <div className="grid md:grid-cols-3 gap-4">
           <Card>
               <CardHeader>
@@ -309,7 +345,58 @@ function DoctorDashboardContent({ stats, loading }: { stats: { patientCount: num
               </CardContent>
           </Card>
       </div>
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline flex items-center gap-2">
+                <BarChart /> Monthly Appointments
+            </CardTitle>
+            <CardDescription>A look at your appointment volume over the current year.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {loading ? (
+                 <Skeleton className="h-64 w-full" />
+            ) : (
+                <AppointmentsChart data={monthlyData} />
+            )}
+        </CardContent>
+      </Card>
+    </>
   )
+}
+
+function AppointmentsChart({ data }: { data: MonthlyAppointment[] }) {
+    const chartConfig = {
+        appointments: {
+            label: 'Appointments',
+            color: 'hsl(var(--primary))',
+        }
+    }
+    return (
+        <ChartContainer config={chartConfig} className="h-64 w-full">
+            <RechartsBarChart accessibilityLayer data={data}>
+                <XAxis
+                    dataKey="month"
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                />
+                <YAxis
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value}`}
+                    allowDecimals={false}
+                />
+                 <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
+                />
+                <Bar dataKey="total" fill="var(--color-appointments)" radius={4} />
+            </RechartsBarChart>
+        </ChartContainer>
+    )
 }
 
 
