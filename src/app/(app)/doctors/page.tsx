@@ -25,26 +25,37 @@ export default function DoctorsPage() {
       setLoading(true);
       setError(null);
       try {
-        const q = query(collection(db, 'users'), where('role', '==', 'doctor'));
-        const querySnapshot = await getDocs(q);
-        const fetchedDoctors = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            uid: data.uid,
-            name: data.fullName,
-            fullName: data.fullName,
-            email: data.email,
-            role: data.role,
-            specialty: data.specialty,
-            avatarUrl: data.avatarUrl || `https://placehold.co/128x128.png?text=${data.fullName.charAt(0)}`,
-            bio: data.bio || 'No biography provided.',
-          } as Doctor;
-        });
+        // Fetch all users and filter on the client. This is a workaround for the complex security rules.
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const fetchedDoctors = usersSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            // We only care about users with the 'doctor' role.
+            if (data.role === 'doctor') {
+              return {
+                id: doc.id,
+                uid: data.uid,
+                name: data.fullName,
+                fullName: data.fullName,
+                email: data.email,
+                role: data.role,
+                specialty: data.specialty,
+                avatarUrl: data.avatarUrl || `https://placehold.co/128x128.png?text=${data.fullName.charAt(0)}`,
+                bio: data.bio || 'No biography provided.',
+              } as Doctor;
+            }
+            return null;
+          })
+          .filter((doc): doc is Doctor => doc !== null); // Filter out any nulls
+
         setDoctors(fetchedDoctors);
       } catch (err: any) {
-          console.error("Error fetching doctors:", err);
-          setError("Failed to fetch doctors. This is likely a Firestore security rule issue. Please ensure your rules allow querying the 'users' collection for doctors.");
+          console.error("Error fetching users:", err);
+          let errorMessage = "Failed to fetch doctors. Please try again later.";
+          if (err.code === 'permission-denied') {
+              errorMessage = "Failed to fetch doctors due to a permission error. Please ensure your Firestore security rules allow reading from the 'users' collection.";
+          }
+          setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -111,7 +122,7 @@ export default function DoctorsPage() {
       ) : (
         <div className="text-center py-16">
           <p className="text-xl font-medium">No doctors found</p>
-          <p className="text-muted-foreground mt-2">There are currently no doctors available. Please check back later.</p>
+          <p className="text-muted-foreground mt-2">There are currently no doctors with the role 'doctor' in the database. Please check your user data.</p>
         </div>
       )}
     </div>
