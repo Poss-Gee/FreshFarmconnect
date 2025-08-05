@@ -22,24 +22,30 @@ export default function DoctorsPage() {
   useEffect(() => {
     const fetchDoctors = async () => {
       setLoading(true);
+      // This query is now allowed by the updated security rules.
       const q = query(collection(db, 'users'), where('role', '==', 'doctor'));
-      const querySnapshot = await getDocs(q);
-      const fetchedDoctors = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          uid: data.uid,
-          name: data.fullName,
-          fullName: data.fullName,
-          email: data.email,
-          role: data.role,
-          specialty: data.specialty,
-          avatarUrl: data.avatarUrl || `https://placehold.co/128x128.png?text=${data.fullName.charAt(0)}`,
-          bio: data.bio || 'No biography provided.',
-        } as Doctor;
-      });
-      setDoctors(fetchedDoctors);
-      setLoading(false);
+      try {
+        const querySnapshot = await getDocs(q);
+        const fetchedDoctors = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            uid: data.uid,
+            name: data.fullName,
+            fullName: data.fullName,
+            email: data.email,
+            role: data.role,
+            specialty: data.specialty,
+            avatarUrl: data.avatarUrl || `https://placehold.co/128x128.png?text=${data.fullName.charAt(0)}`,
+            bio: data.bio || 'No biography provided.',
+          } as Doctor;
+        });
+        setDoctors(fetchedDoctors);
+      } catch (error) {
+          console.error("Error fetching doctors, check Firestore security rules:", error)
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchDoctors();
@@ -98,7 +104,7 @@ export default function DoctorsPage() {
       ) : (
         <div className="text-center py-16">
           <p className="text-xl font-medium">No doctors found</p>
-          <p className="text-muted-foreground mt-2">Try adjusting your search or filter.</p>
+          <p className="text-muted-foreground mt-2">Try adjusting your search or filter, or check your Firestore Security Rules.</p>
         </div>
       )}
     </div>
