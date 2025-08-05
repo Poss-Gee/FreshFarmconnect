@@ -183,7 +183,9 @@ export default function DashboardPage() {
                     <TableCell>{new Date(appt.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</TableCell>
                     <TableCell>{appt.time}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm">View Details</Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href="/appointments">View Details</Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
