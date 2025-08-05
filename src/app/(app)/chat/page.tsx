@@ -38,18 +38,31 @@ export default function ChatPage() {
     if (appUser) {
       const fetchContacts = async () => {
         setLoading(true);
-        const appointmentsQuery = query(
+        
+        // Create two separate queries that the security rules will allow
+        const patientAppointmentsQuery = query(
           collection(db, 'appointments'),
-          where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
+          where('patient.uid', '==', appUser.uid)
         );
-        const appointmentSnapshot = await getDocs(appointmentsQuery);
+        const doctorAppointmentsQuery = query(
+          collection(db, 'appointments'),
+          where('doctor.uid', '==', appUser.uid)
+        );
+
+        // Execute both queries
+        const [patientAppointmentsSnap, doctorAppointmentsSnap] = await Promise.all([
+            getDocs(patientAppointmentsQuery),
+            getDocs(doctorAppointmentsQuery),
+        ]);
 
         const contactMap = new Map<string, ChatContact>();
-        const contactPromises = appointmentSnapshot.docs.map(async (appointmentDoc) => {
+        const allAppointments = [...patientAppointmentsSnap.docs, ...doctorAppointmentsSnap.docs];
+
+        const contactPromises = allAppointments.map(async (appointmentDoc) => {
           const appointmentData = appointmentDoc.data();
           const contactUID = appUser.role === 'patient' ? appointmentData.doctor.uid : appointmentData.patient.uid;
 
-          if (!contactMap.has(contactUID)) {
+          if (contactUID && !contactMap.has(contactUID)) {
             const userDocRef = doc(db, 'users', contactUID);
             const userDocSnap = await getDoc(userDocRef);
 
@@ -78,7 +91,10 @@ export default function ChatPage() {
         setLoading(false);
       };
 
-      fetchContacts();
+      fetchContacts().catch(error => {
+          console.error("Failed to fetch contacts:", error);
+          setLoading(false);
+      });
     }
   }, [appUser]);
 
@@ -104,6 +120,9 @@ export default function ChatPage() {
         });
         setMessages(fetchedMessages);
         setLoadingMessages(false);
+      }, (error) => {
+          console.error("Error fetching messages:", error);
+          setLoadingMessages(false);
       });
 
       return () => unsubscribe();
@@ -301,3 +320,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
