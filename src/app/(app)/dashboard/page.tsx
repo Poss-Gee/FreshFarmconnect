@@ -7,13 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical } from 'lucide-react';
+import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical, Sparkles, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import type { Appointment } from '@/lib/types';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { suggestSpecialist, SymptomCheckerOutput } from '@/ai/flows/symptom-checker-flow';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function DashboardPage() {
   const { appUser, loading } = useAuth();
@@ -184,22 +189,76 @@ function PatientDashboardContent() {
                     </form>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline">Recent Chats</CardTitle>
-                    <CardDescription>Continue your conversations.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <p className="text-muted-foreground">Your recent chats would appear here.</p>
-                     <Button className="mt-4 w-full" variant="outline" asChild>
-                        <Link href="/chat">
-                            Go to Messages
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
+            <SymptomCheckerCard />
         </div>
     )
+}
+
+function SymptomCheckerCard() {
+    const { toast } = useToast();
+    const [symptoms, setSymptoms] = useState('');
+    const [result, setResult] = useState<SymptomCheckerOutput | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (symptoms.trim().length < 10) {
+            toast({
+                title: 'Symptoms Too Short',
+                description: 'Please describe your symptoms in a bit more detail.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        setIsLoading(true);
+        setResult(null);
+        try {
+            const res = await suggestSpecialist({ symptoms });
+            setResult(res);
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: 'Analysis Failed',
+                description: 'Could not analyze symptoms. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2">
+                    <Sparkles className="text-primary" /> AI Symptom Checker
+                </CardTitle>
+                <CardDescription>Not sure which specialist to see? Describe your symptoms to get a suggestion.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <form onSubmit={handleSubmit}>
+                    <Textarea 
+                        placeholder="e.g., I've had a persistent cough and chest pain for the last 3 days..."
+                        value={symptoms}
+                        onChange={(e) => setSymptoms(e.target.value)}
+                        rows={4}
+                        disabled={isLoading}
+                    />
+                    <Button className="mt-4 w-full" type="submit" disabled={isLoading}>
+                        {isLoading ? 'Analyzing...' : 'Analyze Symptoms'}
+                    </Button>
+                 </form>
+
+                {result && (
+                    <Alert className="mt-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Suggestion: See a {result.specialist}</AlertTitle>
+                        <AlertDescription>{result.reasoning}</AlertDescription>
+                    </Alert>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 function DoctorDashboardContent({ stats, loading }: { stats: { patientCount: number, requestCount: number }, loading: boolean }) {
@@ -280,7 +339,7 @@ function DashboardSkeleton() {
             <Skeleton className="h-5 w-40" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-5 w-64 mb-4" />
+            <Skeleton className="h-20 w-full mb-4" />
             <Skeleton className="h-10 w-full" />
           </CardContent>
         </Card>
