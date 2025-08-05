@@ -1,14 +1,8 @@
 
+
 export type UserRole = 'patient' | 'doctor';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl: string;
-  role: UserRole;
-}
-
+// Represents the core user data stored in the 'users' collection
 export interface AppUser {
   uid: string;
   email: string;
@@ -24,6 +18,14 @@ export interface AppUser {
   availability?: Record<string, string[]>;
 }
 
+// A simplified user object, often denormalized/embedded in other documents
+export interface EmbeddedUser {
+  uid: string;
+  name: string;
+  avatarUrl?: string;
+  specialty?: string; // Only for doctors
+}
+
 export interface Doctor extends AppUser {
   id: string;
   name: string;
@@ -31,8 +33,8 @@ export interface Doctor extends AppUser {
 
 export interface Appointment {
   id: string;
-  patient: User;
-  doctor: Doctor;
+  patient: EmbeddedUser;
+  doctor: EmbeddedUser;
   date: string;
   time: string;
   status: 'upcoming' | 'past' | 'cancelled' | 'pending';

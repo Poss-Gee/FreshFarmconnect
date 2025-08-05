@@ -44,28 +44,11 @@ export default function DashboardPage() {
         );
 
         const upcomingSnapshot = await getDocs(upcomingQuery);
-        const appts: Appointment[] = [];
-        const contactPromises = upcomingSnapshot.docs.map(async doc => {
-            const data = doc.data();
-            const contactUID = role === 'patient' ? data.doctor.uid : data.patient.uid;
-            
-            const contactSnap = await getDocs(query(collection(db, "users"), where("uid", "==", contactUID)));
-            if (contactSnap.docs.length === 0) return;
-            const contactData = contactSnap.docs[0].data();
-            
-            const appointment: Appointment = {
-                id: doc.id,
-                patient: role === 'patient' ? { ...appUser } as any : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
-                doctor: role === 'doctor' ? { ...appUser } as any : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
-                date: data.date,
-                time: data.time,
-                status: data.status,
-                reason: data.reason
-            };
-            appts.push(appointment);
-        });
+        const appts = upcomingSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as Appointment));
 
-        await Promise.all(contactPromises);
         setAppointments(appts);
         setAppointmentsLoading(false);
 
@@ -138,8 +121,8 @@ export default function DashboardPage() {
             <TableBody>
               {appointmentsLoading ? (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center h-24">
-                        <Skeleton className='w-full h-8' />
+                    <TableCell colSpan={4} className="h-24 text-center">
+                        Loading...
                     </TableCell>
                 </TableRow>
               ) : appointments.length > 0 ? (

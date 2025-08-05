@@ -89,17 +89,18 @@ export default function DoctorProfilePage() {
         patient: {
           uid: appUser.uid,
           name: appUser.fullName,
-          ref: doc(db, 'users', appUser.uid),
+          avatarUrl: appUser.avatarUrl || `https://placehold.co/100x100.png?text=${appUser.fullName.charAt(0)}`,
         },
         doctor: {
           uid: doctor.uid,
           name: doctor.fullName,
-          ref: doc(db, 'users', doctor.uid),
+          avatarUrl: doctor.avatarUrl,
+          specialty: doctor.specialty,
         },
         date: selectedDate.toISOString().split('T')[0],
         time: selectedTime,
         reason: bookingReason,
-        status: 'pending', // Changed to pending to be reviewed by doctor
+        status: 'pending',
         createdAt: serverTimestamp(),
       });
 

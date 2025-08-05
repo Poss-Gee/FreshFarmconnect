@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Appointment, AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,33 +29,14 @@ export default function AppointmentsPage() {
         where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
       );
 
-      const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        const appts: Appointment[] = [];
-
-        const participantPromises = querySnapshot.docs.map(async (docSnap) => {
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const appts = querySnapshot.docs.map(docSnap => {
             const data = docSnap.data();
-            const otherUserRole = appUser.role === 'patient' ? 'doctor' : 'patient';
-            const otherUserUID = data[otherUserRole].uid;
-            
-            const userDocRef = doc(db, 'users', otherUserUID);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if(userDocSnap.exists()) {
-                const otherUserData = userDocSnap.data() as AppUser;
-                const appointment: Appointment = {
-                    id: docSnap.id,
-                    patient: appUser.role === 'patient' ? { ...appUser, id: appUser.uid, name: appUser.fullName } as any : { ...otherUserData, id: otherUserData.uid, name: otherUserData.fullName } as any,
-                    doctor: appUser.role === 'doctor' ? { ...appUser, id: appUser.uid, name: appUser.fullName } as any : { ...otherUserData, id: otherUserData.uid, name: otherUserData.fullName } as any,
-                    date: data.date,
-                    time: data.time,
-                    status: data.status,
-                    reason: data.reason,
-                };
-                appts.push(appointment);
-            }
+            return {
+                id: docSnap.id,
+                ...data
+            } as Appointment;
         });
-
-        await Promise.all(participantPromises);
         
         setAppointments(appts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         setLoading(false);
@@ -71,15 +52,17 @@ export default function AppointmentsPage() {
   const upcomingAppointments = appointments.filter((appt) => appt.status === 'upcoming');
   const pastAppointments = appointments.filter((appt) => appt.status === 'past');
   const pendingAppointments = appointments.filter((appt) => appt.status === 'pending');
+  const cancelledAppointments = appointments.filter((appt) => appt.status === 'cancelled');
 
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6 font-headline">My Appointments</h1>
       <Tabs defaultValue="upcoming" className="w-full">
-        <TabsList className={`grid w-full ${appUser?.role === 'doctor' ? 'grid-cols-3 md:w-[600px]' : 'grid-cols-2 md:w-[400px]'}`}>
+        <TabsList className={`grid w-full ${appUser?.role === 'doctor' ? 'grid-cols-4 md:w-[600px]' : 'grid-cols-3 md:w-[500px]'}`}>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           {appUser?.role === 'doctor' && <TabsTrigger value="pending">Pending ({pendingAppointments.length})</TabsTrigger>}
           <TabsTrigger value="past">Past</TabsTrigger>
+          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">
           <Card>
@@ -116,6 +99,17 @@ export default function AppointmentsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+         <TabsContent value="cancelled">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cancelled Appointments</CardTitle>
+              <CardDescription>A history of your cancelled appointments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AppointmentsTable appointments={cancelledAppointments} loading={loading} role={appUser?.role} />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -124,7 +118,7 @@ export default function AppointmentsPage() {
 function AppointmentsTable({ appointments, loading, role, isPending = false }: { appointments: Appointment[], loading: boolean, role?: 'patient' | 'doctor', isPending?: boolean }) {
     const { toast } = useToast();
 
-    const handleRequest = async (appointmentId: string, newStatus: 'upcoming' | 'past' | 'cancelled') => {
+    const handleRequest = async (appointmentId: string, newStatus: 'upcoming' | 'cancelled') => {
         const appointmentRef = doc(db, 'appointments', appointmentId);
         try {
             await updateDoc(appointmentRef, { status: newStatus });
@@ -198,7 +192,12 @@ function AppointmentsTable({ appointments, loading, role, isPending = false }: {
                     </div>
                 ) : (
                     <Badge 
-                        variant={appt.status === 'upcoming' ? 'default' : (appt.status === 'pending' ? 'secondary' : 'outline')} 
+                        variant={
+                            appt.status === 'upcoming' ? 'default'
+                            : appt.status === 'past' ? 'secondary'
+                            : appt.status === 'cancelled' ? 'destructive'
+                            : 'outline'
+                        } 
                         className="capitalize"
                     >
                         {appt.status}
