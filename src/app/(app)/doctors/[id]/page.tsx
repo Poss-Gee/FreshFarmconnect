@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Check, Stethoscope } from 'lucide-react';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Doctor, AppUser } from '@/lib/types';
+import type { Doctor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -99,13 +99,13 @@ export default function DoctorProfilePage() {
         date: selectedDate.toISOString().split('T')[0],
         time: selectedTime,
         reason: bookingReason,
-        status: 'upcoming',
+        status: 'pending', // Changed to pending to be reviewed by doctor
         createdAt: serverTimestamp(),
       });
 
       toast({
-        title: 'Appointment Booked!',
-        description: `Your appointment with Dr. ${doctor.name.split(' ').pop()} is confirmed.`,
+        title: 'Appointment Requested!',
+        description: `Your appointment request for Dr. ${doctor.name.split(' ').pop()} has been sent.`,
       });
       setIsConfirming(false);
       setBookingReason('');
@@ -113,7 +113,7 @@ export default function DoctorProfilePage() {
     } catch (error) {
       console.error('Error booking appointment:', error);
       toast({
-        title: 'Booking Failed',
+        title: 'Request Failed',
         description: 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
@@ -136,19 +136,27 @@ export default function DoctorProfilePage() {
 
   const getAvailableTimes = (date: Date | undefined): string[] => {
     if (!date || !doctor?.availability) return [];
-    // Format date as YYYY-MM-DD to match the key in Firestore
-    const dateString = date.toISOString().split('T')[0];
-    return doctor.availability[dateString] || [];
+    // The keys in availability are based on a fixed week (2024-08-12 to 2024-08-18 for Mon-Sun)
+    // We need to map the selected date's day of the week to the corresponding key.
+    const dayOfWeek = date.getDay(); // Sunday - 0, Monday - 1, ..., Saturday - 6
+    const weekMap = [
+      '2024-08-18', // Sun
+      '2024-08-12', // Mon
+      '2024-08-13', // Tue
+      '2024-08-14', // Wed
+      '2024-08-15', // Thu
+      '2024-08-16', // Fri
+      '2024-08-17', // Sat
+    ];
+    const availabilityKey = weekMap[dayOfWeek];
+    return doctor.availability[availabilityKey] || [];
   };
   
   const availableTimes = getAvailableTimes(selectedDate);
 
   const isDateDisabled = (date: Date) => {
     if (date < today) return true;
-    if (!doctor?.availability) return true;
-    const dateString = date.toISOString().split('T')[0];
-    const slots = doctor.availability[dateString];
-    return !slots || slots.length === 0;
+    return getAvailableTimes(date).length === 0;
   }
 
   return (
@@ -236,7 +244,7 @@ export default function DoctorProfilePage() {
                   )}
                   {selectedTime && (
                       <Button className="w-full mt-4" size="lg" onClick={() => setIsConfirming(true)} disabled={appUser?.role === 'doctor'}>
-                          {appUser?.role === 'doctor' ? 'Doctors cannot book' : `Book for ${selectedTime}`}
+                          {appUser?.role === 'doctor' ? 'Doctors cannot book' : `Request for ${selectedTime}`}
                       </Button>
                   )}
                 </div>
@@ -249,11 +257,11 @@ export default function DoctorProfilePage() {
       <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Your Appointment</DialogTitle>
+            <DialogTitle>Confirm Your Appointment Request</DialogTitle>
             <DialogDescription>
-              You are booking an appointment with <span className="font-bold">{doctor.name}</span> on {' '}
+              You are requesting an appointment with <span className="font-bold">{doctor.name}</span> on {' '}
               <span className="font-bold">{selectedDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span> at {' '}
-              <span className="font-bold">{selectedTime}</span>.
+              <span className="font-bold">{selectedTime}</span>. The doctor will review and confirm.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -275,7 +283,7 @@ export default function DoctorProfilePage() {
               </Button>
             </DialogClose>
             <Button onClick={handleBookingConfirmation} disabled={isBooking || !bookingReason}>
-              {isBooking ? 'Confirming...' : 'Confirm Booking'}
+              {isBooking ? 'Sending...' : 'Confirm Request'}
             </Button>
           </DialogFooter>
         </DialogContent>

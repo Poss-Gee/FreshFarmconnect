@@ -11,58 +11,84 @@ import { ArrowUpRight, Search, UserPlus, Users, Stethoscope, BriefcaseMedical } 
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
-import type { Appointment, AppUser } from '@/lib/types';
+import type { Appointment } from '@/lib/types';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function DashboardPage() {
   const { appUser, loading } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [stats, setStats] = useState({ patientCount: 0, requestCount: 0 });
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const role = appUser?.role || 'patient';
   const name = appUser?.fullName?.split(' ')[0] || 'User';
 
   useEffect(() => {
     if (appUser) {
-      const fetchAppointments = async () => {
+      const fetchDashboardData = async () => {
         setAppointmentsLoading(true);
-        const q = query(
-          collection(db, 'appointments'),
-          where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid),
-          where('status', '==', 'upcoming'),
-          limit(3)
-        );
-        const querySnapshot = await getDocs(q);
-        const appts: Appointment[] = [];
-        const doctorPromises: Promise<any>[] = [];
+        setStatsLoading(true);
 
-        querySnapshot.forEach(doc => {
+        const baseAppointmentsQuery = query(
+            collection(db, 'appointments'),
+            where(role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
+        );
+
+        // Fetch recent upcoming appointments
+        const upcomingQuery = query(
+            baseAppointmentsQuery,
+            where('status', '==', 'upcoming'),
+            limit(3)
+        );
+
+        const upcomingSnapshot = await getDocs(upcomingQuery);
+        const appts: Appointment[] = [];
+        const contactPromises = upcomingSnapshot.docs.map(async doc => {
             const data = doc.data();
             const contactUID = role === 'patient' ? data.doctor.uid : data.patient.uid;
             
-            doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", contactUID))).then(snap => {
-                if (snap.docs.length === 0) return;
-                const contactData = snap.docs[0].data();
-                
-                 const appointment: Appointment = {
-                    id: doc.id,
-                    patient: role === 'patient' ? data.patient : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
-                    doctor: role === 'doctor' ? data.doctor : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
-                    date: data.date,
-                    time: data.time,
-                    status: data.status,
-                    reason: data.reason
-                };
-                appts.push(appointment);
-            }))
+            const contactSnap = await getDocs(query(collection(db, "users"), where("uid", "==", contactUID)));
+            if (contactSnap.docs.length === 0) return;
+            const contactData = contactSnap.docs[0].data();
+            
+            const appointment: Appointment = {
+                id: doc.id,
+                patient: role === 'patient' ? data.patient : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
+                doctor: role === 'doctor' ? data.doctor : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
+                date: data.date,
+                time: data.time,
+                status: data.status,
+                reason: data.reason
+            };
+            appts.push(appointment);
         });
 
-        await Promise.all(doctorPromises);
+        await Promise.all(contactPromises);
         setAppointments(appts);
         setAppointmentsLoading(false);
+
+        // Fetch stats for doctors
+        if (role === 'doctor') {
+            const allAppointmentsSnapshot = await getDocs(baseAppointmentsQuery);
+            const patientIds = new Set<string>();
+            let requestCount = 0;
+
+            allAppointmentsSnapshot.forEach(doc => {
+                const data = doc.data();
+                patientIds.add(data.patient.uid);
+                if (data.status === 'pending') {
+                    requestCount++;
+                }
+            });
+            setStats({ patientCount: patientIds.size, requestCount });
+            setStatsLoading(false);
+        } else {
+            setStatsLoading(false);
+        }
       };
-      fetchAppointments();
+      fetchDashboardData();
     }
   }, [appUser, role]);
 
@@ -82,7 +108,7 @@ export default function DashboardPage() {
       </div>
 
       {role === 'patient' && <PatientDashboardContent />}
-      {role === 'doctor' && <DoctorDashboardContent />}
+      {role === 'doctor' && <DoctorDashboardContent stats={stats} loading={statsLoading} />}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -193,7 +219,7 @@ function PatientDashboardContent() {
     )
 }
 
-function DoctorDashboardContent() {
+function DoctorDashboardContent({ stats, loading }: { stats: { patientCount: number, requestCount: number }, loading: boolean }) {
   return (
       <div className="grid md:grid-cols-3 gap-4">
           <Card>
@@ -202,8 +228,8 @@ function DoctorDashboardContent() {
                   <CardDescription>Overview of your patient list.</CardDescription>
               </CardHeader>
               <CardContent>
-                   <p className="text-3xl font-bold">124</p>
-                   <p className="text-sm text-muted-foreground">+5 new this month</p>
+                    {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <p className="text-3xl font-bold">{stats.patientCount}</p>}
+                   <p className="text-sm text-muted-foreground">Total patients</p>
                    <Button className="mt-4 w-full" variant="outline" asChild>
                       <Link href="/patients">
                           View All Patients
@@ -231,7 +257,7 @@ function DoctorDashboardContent() {
                   <CardDescription>Respond to new appointment requests.</CardDescription>
               </CardHeader>
               <CardContent>
-                    <p className="text-3xl font-bold">3</p>
+                    {loading ? <Skeleton className="h-8 w-12 mb-1" /> : <p className="text-3xl font-bold">{stats.requestCount}</p>}
                     <p className="text-sm text-muted-foreground">Pending requests</p>
                    <Button className="mt-4 w-full" variant="outline">
                       Review Requests
