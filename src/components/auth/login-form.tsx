@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -30,9 +31,13 @@ export function LoginForm() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login Error:", error);
+      let description = 'An unexpected error occurred. Please try again.';
+      if (error.code === 'auth/invalid-credential') {
+        description = 'Invalid email or password. Please try again.';
+      }
       toast({
         title: 'Login Failed',
-        description: error.message || 'Invalid credentials. Please try again.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
