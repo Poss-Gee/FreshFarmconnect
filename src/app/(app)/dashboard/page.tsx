@@ -39,17 +39,16 @@ export default function DashboardPage() {
 
         querySnapshot.forEach(doc => {
             const data = doc.data();
-            const doctorRef = data.doctor.ref;
-             doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", doctorRef.id))).then(snap => {
-                const doctorData = snap.docs[0].data();
+            const contactUID = role === 'patient' ? data.doctor.uid : data.patient.uid;
+            
+            doctorPromises.push(getDocs(query(collection(db, "users"), where("uid", "==", contactUID))).then(snap => {
+                if (snap.docs.length === 0) return;
+                const contactData = snap.docs[0].data();
+                
                  const appointment: Appointment = {
                     id: doc.id,
-                    patient: data.patient,
-                    doctor: {
-                        ...doctorData,
-                        id: doctorData.uid,
-                        name: doctorData.fullName,
-                    } as any,
+                    patient: role === 'patient' ? data.patient : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
+                    doctor: role === 'doctor' ? data.doctor : { ...contactData, id: contactData.uid, name: contactData.fullName } as any,
                     date: data.date,
                     time: data.time,
                     status: data.status,
@@ -219,8 +218,10 @@ function DoctorDashboardContent() {
               </CardHeader>
               <CardContent>
                    <p className="text-muted-foreground">Keep your information up to date for patients.</p>
-                   <Button className="mt-4 w-full" variant="outline">
-                      Update Profile
+                   <Button className="mt-4 w-full" variant="outline" asChild>
+                      <Link href="/profile">
+                          Update Profile
+                      </Link>
                   </Button>
               </CardContent>
           </Card>
