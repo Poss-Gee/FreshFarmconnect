@@ -34,6 +34,7 @@ export default function ChatPage() {
         const contactMap = new Map<string, ChatContact>();
         querySnapshot.forEach(doc => {
           const userData = doc.data() as AppUser;
+          // Ensure we don't add duplicates if Firestore returns them for any reason
           if (!contactMap.has(userData.uid)) {
             contactMap.set(userData.uid, {
               id: userData.uid,
@@ -49,7 +50,7 @@ export default function ChatPage() {
         const fetchedContacts = Array.from(contactMap.values());
         setContacts(fetchedContacts);
 
-        if (fetchedContacts.length > 0) {
+        if (fetchedContacts.length > 0 && !selectedContact) {
           setSelectedContact(fetchedContacts[0]);
         }
         setLoading(false);
@@ -57,7 +58,7 @@ export default function ChatPage() {
 
       fetchContacts();
     }
-  }, [appUser]);
+  }, [appUser, selectedContact]);
 
   const handleSelectContact = (contact: ChatContact) => {
     setSelectedContact(contact);
@@ -65,7 +66,7 @@ export default function ChatPage() {
     setMessages([]);
   };
 
-  if (loading || !selectedContact) {
+  if (loading || !selectedContact && contacts.length > 0) {
       return (
         <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
             <div className="flex flex-col border-r bg-card md:col-span-1 p-4 gap-4">
@@ -86,6 +87,18 @@ export default function ChatPage() {
         </div>
       )
   }
+  
+  if (contacts.length === 0) {
+      return (
+          <div className="flex items-center justify-center h-[calc(100vh-theme(spacing.16))]">
+              <div className="text-center">
+                  <h2 className="text-2xl font-semibold">No contacts found</h2>
+                  <p className="text-muted-foreground mt-2">You don't have any contacts to message yet.</p>
+              </div>
+          </div>
+      )
+  }
+
 
   return (
     <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
@@ -107,7 +120,7 @@ export default function ChatPage() {
                 onClick={() => handleSelectContact(contact)}
                 className={cn(
                   'flex items-center gap-3 p-4 text-left transition-colors hover:bg-accent/50',
-                  selectedContact.id === contact.id && 'bg-accent'
+                  selectedContact?.id === contact.id && 'bg-accent'
                 )}
               >
                 <Avatar className="h-10 w-10">
@@ -133,70 +146,81 @@ export default function ChatPage() {
       </div>
 
       <div className="flex flex-col md:col-span-2 xl:col-span-3">
-        <div className="flex items-center gap-4 border-b p-4">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={selectedContact.avatarUrl} alt={selectedContact.name} />
-            <AvatarFallback>{selectedContact.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <h2 className="text-xl font-semibold">{selectedContact.name}</h2>
-        </div>
-        <ScrollArea className="flex-1 p-4 md:p-6">
-          <div className="space-y-4">
-             {messages.length === 0 ? (
-                <div className="text-center text-muted-foreground py-16">
-                    No messages yet. Start the conversation!
-                </div>
-            ) : messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'flex items-end gap-2',
-                  message.sender === 'me' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.sender === 'them' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={selectedContact.avatarUrl} />
-                    <AvatarFallback>{selectedContact.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div
-                  className={cn(
-                    'max-w-xs rounded-2xl p-3 text-sm md:max-w-md',
-                    message.sender === 'me'
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-muted rounded-bl-none'
-                  )}
-                >
-                  <p>{message.text}</p>
-                  <p className={cn(
-                      'text-xs mt-1',
-                      message.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                  )}>{message.timestamp}</p>
-                </div>
-                 {message.sender === 'me' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={appUser?.avatarUrl || ''} />
-                    <AvatarFallback>{appUser?.fullName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                )}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-        <div className="border-t bg-card p-4">
-          <form className="relative">
-            <Input placeholder="Type your message..." className="pr-20" />
-            <div className="absolute inset-y-0 right-0 flex items-center">
-                <Button type="button" size="icon" variant="ghost">
-                    <Smile className="h-5 w-5 text-muted-foreground" />
-                </Button>
-                <Button type="submit" size="icon" variant="ghost">
-                    <Send className="h-5 w-5 text-muted-foreground" />
-                </Button>
+        {selectedContact ? (
+          <>
+            <div className="flex items-center gap-4 border-b p-4">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={selectedContact.avatarUrl} alt={selectedContact.name} />
+                <AvatarFallback>{selectedContact.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-semibold">{selectedContact.name}</h2>
             </div>
-          </form>
-        </div>
+            <ScrollArea className="flex-1 p-4 md:p-6">
+              <div className="space-y-4">
+                 {messages.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-16">
+                        No messages yet. Start the conversation!
+                    </div>
+                ) : messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'flex items-end gap-2',
+                      message.sender === 'me' ? 'justify-end' : 'justify-start'
+                    )}
+                  >
+                    {message.sender === 'them' && (
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={selectedContact.avatarUrl} />
+                        <AvatarFallback>{selectedContact.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div
+                      className={cn(
+                        'max-w-xs rounded-2xl p-3 text-sm md:max-w-md',
+                        message.sender === 'me'
+                          ? 'bg-primary text-primary-foreground rounded-br-none'
+                          : 'bg-muted rounded-bl-none'
+                      )}
+                    >
+                      <p>{message.text}</p>
+                      <p className={cn(
+                          'text-xs mt-1',
+                          message.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      )}>{message.timestamp}</p>
+                    </div>
+                     {message.sender === 'me' && (
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={appUser?.avatarUrl || ''} />
+                        <AvatarFallback>{appUser?.fullName?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            <div className="border-t bg-card p-4">
+              <form className="relative">
+                <Input placeholder="Type your message..." className="pr-20" />
+                <div className="absolute inset-y-0 right-0 flex items-center">
+                    <Button type="button" size="icon" variant="ghost">
+                        <Smile className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                    <Button type="submit" size="icon" variant="ghost">
+                        <Send className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                </div>
+              </form>
+            </div>
+          </>
+        ) : (
+             <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                    <h2 className="text-2xl font-semibold">Select a chat</h2>
+                    <p className="text-muted-foreground mt-2">Choose a contact to start messaging.</p>
+                </div>
+             </div>
+        )}
       </div>
     </div>
   );
