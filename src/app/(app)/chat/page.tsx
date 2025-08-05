@@ -25,23 +25,30 @@ export default function ChatPage() {
     if (appUser) {
       const fetchContacts = async () => {
         setLoading(true);
-        // This is a simplified fetch. A real app would likely have a 'contacts' subcollection.
-        // For now, we fetch all other users to demonstrate.
+        // In a real application, you'd fetch contacts based on past appointments or a friends list.
+        // For now, we'll fetch all other users and ensure they are unique.
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('uid', '!=', appUser.uid));
         const querySnapshot = await getDocs(q);
-        const fetchedContacts: ChatContact[] = querySnapshot.docs.map(doc => {
+        
+        const contactMap = new Map<string, ChatContact>();
+        querySnapshot.forEach(doc => {
           const userData = doc.data() as AppUser;
-          return {
-            id: userData.uid,
-            name: userData.fullName,
-            avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
-            lastMessage: 'No messages yet...',
-            lastMessageTime: '',
-            unreadCount: 0,
-          };
+          if (!contactMap.has(userData.uid)) {
+            contactMap.set(userData.uid, {
+              id: userData.uid,
+              name: userData.fullName,
+              avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
+              lastMessage: 'No messages yet...',
+              lastMessageTime: '',
+              unreadCount: 0,
+            });
+          }
         });
+
+        const fetchedContacts = Array.from(contactMap.values());
         setContacts(fetchedContacts);
+
         if (fetchedContacts.length > 0) {
           setSelectedContact(fetchedContacts[0]);
         }
