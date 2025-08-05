@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -93,7 +94,43 @@ export default {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },
+       typography: (theme: any) => ({
+        DEFAULT: {
+          css: {
+            'h1, h2, h3, h4, h5, h6': {
+              color: theme('colors.foreground'),
+              fontFamily: theme('fontFamily.headline').join(', '),
+            },
+            p: {
+                color: theme('colors.muted.foreground'),
+            },
+            a: {
+                color: theme('colors.primary.DEFAULT'),
+            },
+            strong: {
+                color: theme('colors.foreground'),
+            },
+            ul: {
+              'list-style-position': 'inside',
+              paddingLeft: '0',
+            },
+             'li::marker': {
+                display: 'none',
+             },
+             li: {
+                paddingLeft: '1.5em',
+                position: 'relative',
+             },
+            'li:before': {
+                content: '"\\2713"',
+                position: 'absolute',
+                left: '0',
+                color: theme('colors.primary.DEFAULT'),
+            },
+          },
+        },
+      }),
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [require('tailwindcss-animate'), require('@tailwindcss/typography')],
 } satisfies Config;

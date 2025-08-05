@@ -146,8 +146,8 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} eClinic GH. All rights reserved.</p>
           <div className="flex gap-4 mt-4 sm:mt-0">
-             <Link href="#" className="text-sm text-muted-foreground hover:text-primary">Terms of Service</Link>
-             <Link href="#" className="text-sm text-muted-foreground hover:text-primary">Privacy Policy</Link>
+             <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary">Terms of Service</Link>
+             <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary">Privacy Policy</Link>
           </div>
         </div>
       </footer>
