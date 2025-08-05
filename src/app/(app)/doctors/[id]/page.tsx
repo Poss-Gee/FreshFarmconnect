@@ -9,17 +9,36 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Check, Stethoscope } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Doctor } from '@/lib/types';
+import type { Doctor, AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function DoctorProfilePage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const { appUser } = useAuth();
+  const { toast } = useToast();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [isBooking, setIsBooking] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [bookingReason, setBookingReason] = useState('');
+
 
   useEffect(() => {
     if (id) {
@@ -53,6 +72,56 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
     }
   }, [id]);
 
+  const handleBookingConfirmation = async () => {
+    if (!appUser || !doctor || !selectedDate || !selectedTime || !bookingReason) {
+      toast({
+        title: 'Booking Error',
+        description: 'Please ensure you are logged in and have selected a date, time, and provided a reason.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsBooking(true);
+    try {
+      await addDoc(collection(db, 'appointments'), {
+        patient: {
+          uid: appUser.uid,
+          name: appUser.fullName,
+          ref: doc(db, 'users', appUser.uid),
+        },
+        doctor: {
+          uid: doctor.uid,
+          name: doctor.fullName,
+          ref: doc(db, 'users', doctor.uid),
+        },
+        date: selectedDate.toISOString().split('T')[0],
+        time: selectedTime,
+        reason: bookingReason,
+        status: 'upcoming',
+        createdAt: serverTimestamp(),
+      });
+
+      toast({
+        title: 'Appointment Booked!',
+        description: `Your appointment with Dr. ${doctor.name.split(' ').pop()} is confirmed.`,
+      });
+      setIsConfirming(false);
+      setBookingReason('');
+      setSelectedTime(null);
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      toast({
+        title: 'Booking Failed',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBooking(false);
+    }
+  };
+
+
   if (loading) {
     return <DoctorProfileSkeleton />;
   }
@@ -74,95 +143,135 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
   const availableTimes = getAvailableTimes(selectedDate);
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-1 space-y-6">
-          <Card className="overflow-hidden">
-            <CardContent className="p-6 text-center">
-              <Image
-                src={doctor.avatarUrl}
-                alt={doctor.name}
-                width={128}
-                height={128}
-                className="rounded-full mx-auto mb-4 border-4 border-primary/40 shadow-lg"
-                data-ai-hint="doctor portrait"
-              />
-              <h1 className="text-2xl font-bold font-headline">{doctor.name}</h1>
-              <Badge variant="secondary" className="mt-2 gap-1.5">
-                  <Stethoscope className="h-3.5 w-3.5" />
-                  {doctor.specialty}
-              </Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>About Dr. {doctor.name.split(' ').pop()}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{doctor.bio}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Qualifications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-muted-foreground">
-                {doctor.qualifications?.map((q, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <Check className="h-4 w-4 mt-1 text-primary flex-shrink-0" />
-                    <span>{q}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl">Book an Appointment</CardTitle>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-8">
-              <div className="flex justify-center">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < today || !doctor.availability?.[date.toISOString().split('T')[0]]?.length}
-                  className="rounded-md border"
+    <>
+      <div className="container mx-auto py-8">
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-1 space-y-6">
+            <Card className="overflow-hidden">
+              <CardContent className="p-6 text-center">
+                <Image
+                  src={doctor.avatarUrl}
+                  alt={doctor.name}
+                  width={128}
+                  height={128}
+                  className="rounded-full mx-auto mb-4 border-4 border-primary/40 shadow-lg"
+                  data-ai-hint="doctor portrait"
                 />
-              </div>
-              <div className="space-y-4">
-                <h3 className="font-semibold">
-                  Available Slots for {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '...'}
-                </h3>
-                {selectedDate && availableTimes.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {availableTimes.map((time) => (
-                      <Button
-                        key={time}
-                        variant={selectedTime === time ? 'default' : 'outline'}
-                        onClick={() => setSelectedTime(time)}
-                      >
-                        {time}
+                <h1 className="text-2xl font-bold font-headline">{doctor.name}</h1>
+                <Badge variant="secondary" className="mt-2 gap-1.5">
+                    <Stethoscope className="h-3.5 w-3.5" />
+                    {doctor.specialty}
+                </Badge>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>About Dr. {doctor.name.split(' ').pop()}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">{doctor.bio}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Qualifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-muted-foreground">
+                  {doctor.qualifications?.map((q, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="h-4 w-4 mt-1 text-primary flex-shrink-0" />
+                      <span>{q}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="md:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-2xl">Book an Appointment</CardTitle>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-8">
+                <div className="flex justify-center">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                        setSelectedDate(date);
+                        setSelectedTime(null);
+                    }}
+                    disabled={(date) => date < today || !doctor.availability?.[date.toISOString().split('T')[0]]?.length}
+                    className="rounded-md border"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <h3 className="font-semibold">
+                    Available Slots for {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '...'}
+                  </h3>
+                  {selectedDate && availableTimes.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableTimes.map((time) => (
+                        <Button
+                          key={time}
+                          variant={selectedTime === time ? 'default' : 'outline'}
+                          onClick={() => setSelectedTime(time)}
+                        >
+                          {time}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No available slots for this day. Please select another date.</p>
+                  )}
+                  {selectedTime && (
+                      <Button className="w-full mt-4" size="lg" onClick={() => setIsConfirming(true)} disabled={appUser?.role === 'doctor'}>
+                          {appUser?.role === 'doctor' ? 'Doctors cannot book' : `Book for ${selectedTime}`}
                       </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No available slots for this day. Please select another date.</p>
-                )}
-                 {selectedTime && (
-                    <Button className="w-full mt-4" size="lg">
-                        Confirm Booking for {selectedTime}
-                    </Button>
-                 )}
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+
+      <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Your Appointment</DialogTitle>
+            <DialogDescription>
+              You are booking an appointment with <span className="font-bold">{doctor.name}</span> on {' '}
+              <span className="font-bold">{selectedDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span> at {' '}
+              <span className="font-bold">{selectedTime}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="reason" className="text-right">
+              Reason for Appointment
+            </Label>
+            <Textarea
+              id="reason"
+              value={bookingReason}
+              onChange={(e) => setBookingReason(e.target.value)}
+              className="mt-2"
+              placeholder="Please briefly describe the reason for your visit..."
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button onClick={handleBookingConfirmation} disabled={isBooking || !bookingReason}>
+              {isBooking ? 'Confirming...' : 'Confirm Booking'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -219,3 +328,4 @@ function DoctorProfileSkeleton() {
     </div>
   );
 }
+
