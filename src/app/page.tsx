@@ -103,7 +103,7 @@ export default function Home() {
               <Image
                 src="https://placehold.co/600x400.png"
                 alt="Doctor consulting patient"
-                data-ai-hint="doctor patient"
+                data-ai-hint="doctor consulting"
                 width={600}
                 height={400}
                 className="rounded-xl shadow-2xl"
