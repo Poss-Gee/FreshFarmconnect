@@ -170,6 +170,10 @@ export default function ChatPage() {
 
     try {
         if (mode === 'everyone') {
+             if (messageToDelete.senderId !== appUser.uid) {
+                toast({ title: 'Error', description: 'You can only delete your own messages for everyone.', variant: 'destructive' });
+                return;
+            }
             await deleteDoc(messageRef);
             toast({
                 title: 'Message Deleted',
@@ -377,7 +381,7 @@ export default function ChatPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete message?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Choose whether to delete this message just for you, or for everyone in the conversation.
+                    This action cannot be undone. Choose how you want to delete this message.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
@@ -385,12 +389,16 @@ export default function ChatPage() {
                 <Button variant="outline" onClick={() => handleDeleteMessage('me')} disabled={isDeleting}>
                     {isDeleting ? 'Removing...' : 'Delete for me'}
                 </Button>
-                <Button variant="destructive" onClick={() => handleDeleteMessage('everyone')} disabled={isDeleting}>
-                    {isDeleting ? 'Deleting...' : 'Delete for everyone'}
-                </Button>
+                {messageToDelete?.senderId === appUser?.uid && (
+                    <Button variant="destructive" onClick={() => handleDeleteMessage('everyone')} disabled={isDeleting}>
+                        {isDeleting ? 'Deleting...' : 'Delete for everyone'}
+                    </Button>
+                )}
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
     </>
   );
 }
+
+    
