@@ -10,11 +10,13 @@ import type { ChatContact, ChatMessage, AppUser, Appointment } from '@/lib/types
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, doc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+
+type DeleteMode = 'me' | 'everyone';
 
 export default function ChatPage() {
   const { appUser } = useAuth();
@@ -70,7 +72,7 @@ export default function ChatPage() {
                         id: otherUser.uid,
                         name: otherUser.name,
                         avatarUrl: otherUser.avatarUrl || `https://placehold.co/100x100.png?text=${otherUser.name.charAt(0)}`,
-                        lastMessage: 'Click to start chatting...',
+                        lastMessage: 'Click to start a conversation...',
                         lastMessageTime: '',
                         unreadCount: 0,
                     });
@@ -109,13 +111,17 @@ export default function ChatPage() {
         const fetchedMessages: ChatMessage[] = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          fetchedMessages.push({
-            id: doc.id,
-            text: data.text,
-            timestamp: data.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '',
-            sender: data.senderId === appUser.uid ? 'me' : 'them',
-            senderId: data.senderId,
-          });
+          // Filter out messages deleted by the current user
+          if (!data.deletedBy || !data.deletedBy.includes(appUser.uid)) {
+            fetchedMessages.push({
+                id: doc.id,
+                text: data.text,
+                timestamp: data.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '',
+                sender: data.senderId === appUser.uid ? 'me' : 'them',
+                senderId: data.senderId,
+                deletedBy: data.deletedBy || [],
+            });
+          }
         });
         setMessages(fetchedMessages);
         setLoadingMessages(false);
@@ -147,6 +153,7 @@ export default function ChatPage() {
         senderId: appUser.uid,
         receiverId: selectedContact.id,
         timestamp: serverTimestamp(),
+        deletedBy: [],
       });
       setNewMessage('');
     } catch (error) {
@@ -154,7 +161,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleDeleteMessage = async () => {
+  const handleDeleteMessage = async (mode: DeleteMode) => {
     if (!messageToDelete || !appUser || !selectedContact) return;
     
     setIsDeleting(true);
@@ -162,16 +169,26 @@ export default function ChatPage() {
     const messageRef = doc(db, 'chats', chatId, 'messages', messageToDelete.id);
 
     try {
-        await deleteDoc(messageRef);
-        toast({
-            title: 'Message Deleted',
-            description: 'The message has been removed.',
-        });
+        if (mode === 'everyone') {
+            await deleteDoc(messageRef);
+            toast({
+                title: 'Message Deleted',
+                description: 'The message has been removed for everyone.',
+            });
+        } else { // mode === 'me'
+            await updateDoc(messageRef, {
+                deletedBy: arrayUnion(appUser.uid)
+            });
+            toast({
+                title: 'Message Removed',
+                description: 'The message has been removed from your view.',
+            });
+        }
     } catch (error) {
-        console.error("Error deleting message:", error);
+        console.error("Error handling message deletion:", error);
         toast({
             title: 'Error',
-            description: 'Could not delete the message. Please try again.',
+            description: 'Could not update the message. Please try again.',
             variant: 'destructive',
         });
     } finally {
@@ -358,21 +375,22 @@ export default function ChatPage() {
     <AlertDialog open={!!messageToDelete} onOpenChange={() => setMessageToDelete(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogTitle>Delete message?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This will permanently delete the message for everyone in this conversation. This action cannot be undone.
+                    Choose whether to delete this message just for you, or for everyone in the conversation.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
                 <AlertDialogCancel onClick={() => setMessageToDelete(null)}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteMessage} disabled={isDeleting}>
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                </AlertDialogAction>
+                <Button variant="outline" onClick={() => handleDeleteMessage('me')} disabled={isDeleting}>
+                    {isDeleting ? 'Removing...' : 'Delete for me'}
+                </Button>
+                <Button variant="destructive" onClick={() => handleDeleteMessage('everyone')} disabled={isDeleting}>
+                    {isDeleting ? 'Deleting...' : 'Delete for everyone'}
+                </Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
     </>
   );
 }
-
-    

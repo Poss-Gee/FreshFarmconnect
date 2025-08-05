@@ -56,6 +56,7 @@ export interface ChatMessage {
   timestamp: string;
   sender: 'me' | 'them';
   senderId: string;
+  deletedBy?: string[]; // Array of UIDs who deleted it for themselves
 }
 
 export interface ChatConversation {
