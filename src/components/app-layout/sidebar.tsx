@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -17,6 +18,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { cn } from '@/lib/utils';
 
 const patientNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -56,11 +58,12 @@ export default function AppSidebar() {
               <TooltipTrigger asChild>
                 <Link
                   href={item.href}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8 ${
+                  className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8',
                     pathname.startsWith(item.href)
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  )}
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="sr-only">{item.label}</span>

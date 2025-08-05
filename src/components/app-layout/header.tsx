@@ -34,6 +34,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
+import { cn } from '@/lib/utils';
 
 const patientNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -82,20 +83,19 @@ export default function Header() {
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
-              className="group flex items-center gap-2 text-lg font-semibold"
+              className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Stethoscope className="h-6 w-6 text-primary" />
-              <span>eClinic GH</span>
+              <Stethoscope className="h-5 w-5 transition-all group-hover:scale-110" />
+              <span className="sr-only">eClinic GH</span>
             </Link>
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-4 px-2.5 ${
-                  pathname.startsWith(item.href)
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={cn(
+                  'flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground',
+                   pathname.startsWith(item.href) && 'text-foreground'
+                )}
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
