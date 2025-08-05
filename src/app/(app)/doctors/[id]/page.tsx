@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-export default function DoctorProfilePage({ params: { id } }: { params: { id: string } }) {
+export default function DoctorProfilePage() {
+  const params = useParams();
+  const id = params.id as string;
   const { appUser } = useAuth();
   const { toast } = useToast();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
@@ -133,13 +135,21 @@ export default function DoctorProfilePage({ params: { id } }: { params: { id: st
   today.setHours(0, 0, 0, 0);
 
   const getAvailableTimes = (date: Date | undefined): string[] => {
-    if (!date) return [];
+    if (!date || !doctor?.availability) return [];
     // Format date as YYYY-MM-DD to match the key in Firestore
     const dateString = date.toISOString().split('T')[0];
-    return doctor.availability?.[dateString] || [];
+    return doctor.availability[dateString] || [];
   };
   
   const availableTimes = getAvailableTimes(selectedDate);
+
+  const isDateDisabled = (date: Date) => {
+    if (date < today) return true;
+    if (!doctor?.availability) return true;
+    const dateString = date.toISOString().split('T')[0];
+    const slots = doctor.availability[dateString];
+    return !slots || slots.length === 0;
+  }
 
   return (
     <>
@@ -201,7 +211,7 @@ export default function DoctorProfilePage({ params: { id } }: { params: { id: st
                         setSelectedDate(date);
                         setSelectedTime(null);
                     }}
-                    disabled={(date) => date < today || !doctor.availability?.[date.toISOString().split('T')[0]]?.length}
+                    disabled={isDateDisabled}
                     className="rounded-md border"
                   />
                 </div>
@@ -327,5 +337,3 @@ function DoctorProfileSkeleton() {
     </div>
   );
 }
-
-    
