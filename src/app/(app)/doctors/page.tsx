@@ -18,13 +18,14 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [specialty, setSpecialty] = useState('all');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDoctors = async () => {
       setLoading(true);
-      // This query is now allowed by the updated security rules.
-      const q = query(collection(db, 'users'), where('role', '==', 'doctor'));
+      setError(null);
       try {
+        const q = query(collection(db, 'users'), where('role', '==', 'doctor'));
         const querySnapshot = await getDocs(q);
         const fetchedDoctors = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -41,8 +42,9 @@ export default function DoctorsPage() {
           } as Doctor;
         });
         setDoctors(fetchedDoctors);
-      } catch (error) {
-          console.error("Error fetching doctors, check Firestore security rules:", error)
+      } catch (err: any) {
+          console.error("Error fetching doctors:", err);
+          setError("Failed to fetch doctors. This is likely a Firestore security rule issue. Please ensure your rules allow querying the 'users' collection for doctors.");
       } finally {
         setLoading(false);
       }
@@ -95,6 +97,11 @@ export default function DoctorsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => <DoctorCardSkeleton key={i} />)}
         </div>
+      ) : error ? (
+        <div className="text-center py-16 text-destructive">
+          <p className="text-xl font-medium">An Error Occurred</p>
+          <p className="text-muted-foreground mt-2">{error}</p>
+        </div>
       ) : filteredDoctors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredDoctors.map((doctor) => (
@@ -104,7 +111,7 @@ export default function DoctorsPage() {
       ) : (
         <div className="text-center py-16">
           <p className="text-xl font-medium">No doctors found</p>
-          <p className="text-muted-foreground mt-2">Try adjusting your search or filter, or check your Firestore Security Rules.</p>
+          <p className="text-muted-foreground mt-2">There are currently no doctors available. Please check back later.</p>
         </div>
       )}
     </div>
