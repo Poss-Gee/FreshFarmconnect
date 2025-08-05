@@ -8,44 +8,70 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Appointment, AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Check, X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 export default function AppointmentsPage() {
   const { appUser } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'upcoming';
 
   useEffect(() => {
     if (appUser) {
-      setLoading(true);
-      const q = query(
-        collection(db, 'appointments'),
-        where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
-      );
-
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const appts = querySnapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            return {
-                id: docSnap.id,
-                ...data
-            } as Appointment;
-        });
+        setLoading(true);
         
-        setAppointments(appts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        setLoading(false);
-      }, (error) => {
-        console.error("Error fetching appointments:", error);
-        setLoading(false);
-      });
+        // Firestore rules require separate queries for patient and doctor roles
+        // instead of a compound 'OR' query on different fields.
+        const patientQuery = query(collection(db, 'appointments'), where('patient.uid', '==', appUser.uid));
+        const doctorQuery = query(collection(db, 'appointments'), where('doctor.uid', '==', appUser.uid));
 
-      return () => unsubscribe();
+        const patientUnsubscribe = onSnapshot(patientQuery, (snapshot) => {
+            updateAppointmentsFromSnapshot(snapshot);
+        }, (error) => {
+            console.error("Error fetching patient appointments:", error);
+            setLoading(false);
+        });
+
+        let doctorUnsubscribe = () => {};
+        if (appUser.role === 'doctor') {
+            doctorUnsubscribe = onSnapshot(doctorQuery, (snapshot) => {
+                updateAppointmentsFromSnapshot(snapshot);
+            }, (error) => {
+                console.error("Error fetching doctor appointments:", error);
+                setLoading(false);
+            });
+        } else {
+             setLoading(false);
+        }
+
+        const updateAppointmentsFromSnapshot = (snapshot: any) => {
+            const newAppointments = snapshot.docs.map((docSnap: any) => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+            } as Appointment));
+            
+            setAppointments(prev => {
+                const appointmentMap = new Map(prev.map(a => [a.id, a]));
+                newAppointments.forEach(a => appointmentMap.set(a.id, a));
+                const allAppointments = Array.from(appointmentMap.values());
+                allAppointments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                return allAppointments;
+            });
+             setLoading(false);
+        };
+
+        return () => {
+            patientUnsubscribe();
+            doctorUnsubscribe();
+        };
     }
   }, [appUser]);
 
@@ -57,7 +83,7 @@ export default function AppointmentsPage() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6 font-headline">My Appointments</h1>
-      <Tabs defaultValue="upcoming" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className={`grid w-full ${appUser?.role === 'doctor' ? 'grid-cols-4 md:w-[600px]' : 'grid-cols-3 md:w-[500px]'}`}>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           {appUser?.role === 'doctor' && <TabsTrigger value="pending">Pending ({pendingAppointments.length})</TabsTrigger>}
@@ -210,3 +236,5 @@ function AppointmentsTable({ appointments, loading, role, isPending = false }: {
     </Table>
   );
 }
+
+    
