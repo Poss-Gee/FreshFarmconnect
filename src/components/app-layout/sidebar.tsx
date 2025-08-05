@@ -14,6 +14,7 @@ import {
   CalendarDays,
   MessageSquare,
   Users,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -21,12 +22,14 @@ const patientNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/doctors', icon: Stethoscope, label: 'Find a Doctor' },
   { href: '/appointments', icon: CalendarDays, label: 'Appointments' },
+  { href: '/prescriptions', icon: FileText, label: 'Prescriptions' },
   { href: '/chat', icon: MessageSquare, label: 'Messages' },
 ];
 
 const doctorNavItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/appointments', icon: CalendarDays, label: 'Appointments' },
+    { href: '/prescriptions', icon: FileText, label: 'Prescriptions' },
     { href: '/chat', icon: MessageSquare, label: 'Messages' },
     { href: '/patients', icon: Users, label: 'My Patients' },
 ]

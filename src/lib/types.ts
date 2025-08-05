@@ -63,3 +63,15 @@ export interface ChatConversation {
   contact: ChatContact;
   messages: ChatMessage[];
 }
+
+export interface Prescription {
+  id: string;
+  patient: EmbeddedUser;
+  doctor: EmbeddedUser;
+  medication: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  notes?: string;
+  createdAt: string; // Stored as ISO string
+}
