@@ -2,6 +2,7 @@
 import { Stethoscope } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
+import { Button } from '@/components/ui/button';
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,9 +34,4 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       </footer>
     </div>
   );
-}
-
-// We need this to exist for the legal layout but it's not a real component
-const Button = ({children, ...props}: any) => {
-    return <div {...props}>{children}</div>
 }
