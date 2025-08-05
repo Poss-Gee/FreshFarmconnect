@@ -78,15 +78,15 @@ export default function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
-           <SheetTitle className="sr-only">Menu</SheetTitle>
-          <SheetDescription className="sr-only">App navigation links</SheetDescription>
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
-              className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
+              className="group flex h-10 shrink-0 items-center justify-center gap-2 rounded-full text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Stethoscope className="h-5 w-5 transition-all group-hover:scale-110" />
-              <span className="sr-only">eClinic GH</span>
+              <div className="flex items-center gap-2 text-foreground">
+                <Stethoscope className="h-6 w-6 text-primary" />
+                <span className="font-bold text-lg">eClinic GH</span>
+              </div>
             </Link>
             {navItems.map((item) => (
               <Link
