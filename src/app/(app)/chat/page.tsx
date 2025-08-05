@@ -10,7 +10,7 @@ import type { ChatContact, ChatMessage, AppUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -25,28 +25,39 @@ export default function ChatPage() {
     if (appUser) {
       const fetchContacts = async () => {
         setLoading(true);
-        // In a real application, you'd fetch contacts based on past appointments or a friends list.
-        // For now, we'll fetch all other users and ensure they are unique.
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '!=', appUser.uid));
-        const querySnapshot = await getDocs(q);
         
+        // Fetch appointments to determine contacts
+        const appointmentsQuery = query(
+          collection(db, 'appointments'),
+          where(appUser.role === 'patient' ? 'patient.uid' : 'doctor.uid', '==', appUser.uid)
+        );
+        const appointmentSnapshot = await getDocs(appointmentsQuery);
+
         const contactMap = new Map<string, ChatContact>();
-        querySnapshot.forEach(doc => {
-          const userData = doc.data() as AppUser;
-          // Ensure we don't add duplicates if Firestore returns them for any reason
-          if (!contactMap.has(userData.uid)) {
-            contactMap.set(userData.uid, {
-              id: userData.uid,
-              name: userData.fullName,
-              avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
-              lastMessage: 'No messages yet...',
-              lastMessageTime: '',
-              unreadCount: 0,
-            });
+        const contactPromises = appointmentSnapshot.docs.map(async (appointmentDoc) => {
+          const appointmentData = appointmentDoc.data();
+          const contactUID = appUser.role === 'patient' ? appointmentData.doctor.uid : appointmentData.patient.uid;
+
+          if (!contactMap.has(contactUID)) {
+            const userDocRef = doc(db, 'users', contactUID);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data() as AppUser;
+                contactMap.set(userData.uid, {
+                    id: userData.uid,
+                    name: userData.fullName,
+                    avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
+                    lastMessage: 'Click to start chatting...',
+                    lastMessageTime: '',
+                    unreadCount: 0,
+                });
+            }
           }
         });
 
+        await Promise.all(contactPromises);
+        
         const fetchedContacts = Array.from(contactMap.values());
         setContacts(fetchedContacts);
 
@@ -66,7 +77,7 @@ export default function ChatPage() {
     setMessages([]);
   };
 
-  if (loading || !selectedContact && contacts.length > 0) {
+  if (loading || (!selectedContact && contacts.length > 0)) {
       return (
         <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
             <div className="flex flex-col border-r bg-card md:col-span-1 p-4 gap-4">
@@ -93,7 +104,7 @@ export default function ChatPage() {
           <div className="flex items-center justify-center h-[calc(100vh-theme(spacing.16))]">
               <div className="text-center">
                   <h2 className="text-2xl font-semibold">No contacts found</h2>
-                  <p className="text-muted-foreground mt-2">You don't have any contacts to message yet.</p>
+                  <p className="text-muted-foreground mt-2">Book an appointment with a {appUser?.role === 'patient' ? 'doctor' : 'patient'} to start a conversation.</p>
               </div>
           </div>
       )
