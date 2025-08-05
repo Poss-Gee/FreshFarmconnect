@@ -5,23 +5,28 @@ import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Send, Smile } from 'lucide-react';
+import { Search, Send, Smile, Trash2 } from 'lucide-react';
 import type { ChatContact, ChatMessage, AppUser, Appointment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, where, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ChatPage() {
   const { appUser } = useAuth();
+  const { toast } = useToast();
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<ChatContact | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<ChatMessage | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -149,6 +154,32 @@ export default function ChatPage() {
     }
   };
 
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete || !appUser || !selectedContact) return;
+    
+    setIsDeleting(true);
+    const chatId = [appUser.uid, selectedContact.id].sort().join('_');
+    const messageRef = doc(db, 'chats', chatId, 'messages', messageToDelete.id);
+
+    try {
+        await deleteDoc(messageRef);
+        toast({
+            title: 'Message Deleted',
+            description: 'The message has been removed.',
+        });
+    } catch (error) {
+        console.error("Error deleting message:", error);
+        toast({
+            title: 'Error',
+            description: 'Could not delete the message. Please try again.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsDeleting(false);
+        setMessageToDelete(null);
+    }
+  };
+
 
   if (loading) {
       return (
@@ -185,6 +216,7 @@ export default function ChatPage() {
 
 
   return (
+    <>
     <div className="grid h-[calc(100vh-theme(spacing.16))] w-full grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
       <div className="flex flex-col border-r bg-card md:col-span-1">
         <div className="flex items-center gap-2 border-b p-4">
@@ -251,10 +283,20 @@ export default function ChatPage() {
                   <div
                     key={message.id}
                     className={cn(
-                      'flex items-end gap-2',
+                      'flex items-end gap-2 group',
                       message.sender === 'me' ? 'justify-end' : 'justify-start'
                     )}
                   >
+                    {message.sender === 'me' && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setMessageToDelete(message)}
+                        >
+                            <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    )}
                     {message.sender === 'them' && (
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={selectedContact.avatarUrl} />
@@ -312,6 +354,24 @@ export default function ChatPage() {
         )}
       </div>
     </div>
+    
+    <AlertDialog open={!!messageToDelete} onOpenChange={() => setMessageToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete the message for everyone in this conversation. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setMessageToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteMessage} disabled={isDeleting}>
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
