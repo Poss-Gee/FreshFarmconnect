@@ -33,7 +33,7 @@ export function LoginForm() {
       console.error("Login Error:", error);
       let description = 'An unexpected error occurred. Please try again.';
       if (error.code === 'auth/invalid-credential') {
-        description = 'Invalid email or password. Please try again.';
+        description = 'Invalid email or password. Please check your credentials and try again.';
       }
       toast({
         title: 'Login Failed',
