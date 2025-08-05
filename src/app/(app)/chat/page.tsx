@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Send, Smile } from 'lucide-react';
-import type { ChatContact, ChatMessage, AppUser } from '@/lib/types';
+import type { ChatContact, ChatMessage, AppUser, Appointment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, where, getDoc, doc, onSnapshot, addDoc, serverTimestamp, orderBy, collectionGroup, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -39,7 +39,6 @@ export default function ChatPage() {
       const fetchContacts = async () => {
         setLoading(true);
         
-        // Create two separate queries that the security rules will allow
         const patientAppointmentsQuery = query(
           collection(db, 'appointments'),
           where('patient.uid', '==', appUser.uid)
@@ -49,38 +48,33 @@ export default function ChatPage() {
           where('doctor.uid', '==', appUser.uid)
         );
 
-        // Execute both queries
         const [patientAppointmentsSnap, doctorAppointmentsSnap] = await Promise.all([
             getDocs(patientAppointmentsQuery),
             getDocs(doctorAppointmentsQuery),
         ]);
 
         const contactMap = new Map<string, ChatContact>();
-        const allAppointments = [...patientAppointmentsSnap.docs, ...doctorAppointmentsSnap.docs];
 
-        const contactPromises = allAppointments.map(async (appointmentDoc) => {
-          const appointmentData = appointmentDoc.data();
-          const contactUID = appUser.role === 'patient' ? appointmentData.doctor.uid : appointmentData.patient.uid;
+        const processAppointments = (appointmentsSnapshot: any) => {
+            appointmentsSnapshot.forEach((docSnap: any) => {
+                const appointment = docSnap.data() as Appointment;
+                const otherUser = appUser.role === 'patient' ? appointment.doctor : appointment.patient;
+                
+                if (otherUser && otherUser.uid && !contactMap.has(otherUser.uid)) {
+                    contactMap.set(otherUser.uid, {
+                        id: otherUser.uid,
+                        name: otherUser.name,
+                        avatarUrl: otherUser.avatarUrl || `https://placehold.co/100x100.png?text=${otherUser.name.charAt(0)}`,
+                        lastMessage: 'Click to start chatting...',
+                        lastMessageTime: '',
+                        unreadCount: 0,
+                    });
+                }
+            });
+        }
 
-          if (contactUID && !contactMap.has(contactUID)) {
-            const userDocRef = doc(db, 'users', contactUID);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data() as AppUser;
-                contactMap.set(userData.uid, {
-                    id: userData.uid,
-                    name: userData.fullName,
-                    avatarUrl: userData.avatarUrl || `https://placehold.co/100x100.png?text=${userData.fullName.charAt(0)}`,
-                    lastMessage: 'Click to start chatting...',
-                    lastMessageTime: '',
-                    unreadCount: 0,
-                });
-            }
-          }
-        });
-
-        await Promise.all(contactPromises);
+        processAppointments(patientAppointmentsSnap);
+        processAppointments(doctorAppointmentsSnap);
         
         const fetchedContacts = Array.from(contactMap.values());
         setContacts(fetchedContacts);
@@ -96,7 +90,7 @@ export default function ChatPage() {
           setLoading(false);
       });
     }
-  }, [appUser]);
+  }, [appUser, selectedContact]);
 
 
   // Listen for messages for the selected contact
