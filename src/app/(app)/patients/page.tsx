@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { AppUser } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,11 @@ import { MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
-interface Patient extends AppUser {
+interface Patient {
+    uid: string;
+    fullName: string;
+    email: string; // The patient's email. We can't get this from the appointment. Let's remove it for now.
+    avatarUrl?: string;
     lastAppointment?: string;
 }
 
@@ -35,30 +39,29 @@ export default function PatientsPage() {
                 
                 const patientMap = new Map<string, Patient>();
 
-                const patientPromises = appointmentsSnapshot.docs.map(async (appointmentDoc) => {
-                    const appointmentData = appointmentDoc.data();
-                    const patientUID = appointmentData.patient.uid;
+                appointmentsSnapshot.docs.forEach((doc) => {
+                    const appointmentData = doc.data();
+                    const patientInfo = appointmentData.patient;
 
-                    if (!patientMap.has(patientUID)) {
-                         const userDocRef = doc(db, 'users', patientUID);
-                         const userDocSnap = await getDoc(userDocRef);
-                         if (userDocSnap.exists()) {
-                             const userData = userDocSnap.data() as AppUser;
-                             patientMap.set(patientUID, {
-                                 ...userData,
-                                 lastAppointment: appointmentData.date, 
-                             });
-                         }
-                    } else {
-                        // Optionally update last appointment date if a newer one is found
-                        const existingPatient = patientMap.get(patientUID)!;
-                        if (new Date(appointmentData.date) > new Date(existingPatient.lastAppointment || 0)) {
-                            existingPatient.lastAppointment = appointmentData.date;
+                    if (patientInfo && patientInfo.uid) {
+                         const existingPatient = patientMap.get(patientInfo.uid);
+                        if (existingPatient) {
+                            if (new Date(appointmentData.date) > new Date(existingPatient.lastAppointment || 0)) {
+                                existingPatient.lastAppointment = appointmentData.date;
+                            }
+                        } else {
+                            patientMap.set(patientInfo.uid, {
+                                uid: patientInfo.uid,
+                                fullName: patientInfo.name,
+                                avatarUrl: patientInfo.avatarUrl,
+                                // Email is not available on the denormalized record, which is correct for privacy.
+                                // We will omit it from the table.
+                                email: 'N/A', 
+                                lastAppointment: appointmentData.date, 
+                            });
                         }
                     }
                 });
-
-                await Promise.all(patientPromises);
                 
                 const sortedPatients = Array.from(patientMap.values()).sort((a,b) => a.fullName.localeCompare(b.fullName));
                 setPatients(sortedPatients);
@@ -121,7 +124,6 @@ function PatientsTable({ patients, loading }: { patients: Patient[], loading: bo
       <TableHeader>
         <TableRow>
           <TableHead>Patient</TableHead>
-          <TableHead>Email</TableHead>
           <TableHead>Last Appointment</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -138,7 +140,6 @@ function PatientsTable({ patients, loading }: { patients: Patient[], loading: bo
                 <p className="font-medium">{patient.fullName}</p>
               </div>
             </TableCell>
-            <TableCell>{patient.email}</TableCell>
             <TableCell>
                 {patient.lastAppointment ? new Date(patient.lastAppointment).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric'}) : 'N/A'}
             </TableCell>
