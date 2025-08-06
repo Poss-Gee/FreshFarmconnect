@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Check, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
-export default function AppointmentsPage() {
+function AppointmentsPageComponent() {
   const { appUser } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +139,14 @@ export default function AppointmentsPage() {
       </Tabs>
     </div>
   );
+}
+
+export default function AppointmentsPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <AppointmentsPageComponent />
+        </Suspense>
+    )
 }
 
 function AppointmentsTable({ appointments, loading, role, isPending = false }: { appointments: Appointment[], loading: boolean, role?: 'patient' | 'doctor', isPending?: boolean }) {
