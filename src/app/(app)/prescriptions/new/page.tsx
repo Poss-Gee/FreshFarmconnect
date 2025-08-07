@@ -40,6 +40,14 @@ export default function NewPrescriptionPage() {
 
   const form = useForm<PrescriptionFormData>({
     resolver: zodResolver(prescriptionSchema),
+    defaultValues: {
+      patientUid: '',
+      medication: '',
+      dosage: '',
+      frequency: '',
+      duration: '',
+      notes: '',
+    }
   });
 
   useEffect(() => {
