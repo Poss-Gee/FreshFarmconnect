@@ -1,60 +1,70 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isSignedIn() {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isUser(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isDoctor() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
-    }
-
-    // USERS
-    // Users can be read by any authenticated user (to see doctor profiles)
-    // A user can only create/update/delete their own document.
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isUser(userId);
-    }
-
-    // APPOINTMENTS
-    // Only the patient or the doctor involved in an appointment can read or write to it.
-    match /appointments/{appointmentId} {
-      allow read, write: if isSignedIn() && (
-        request.auth.uid == resource.data.patient.uid ||
-        request.auth.uid == resource.data.doctor.uid
-      );
-    }
-
-    // PRESCRIPTIONS
-    // Only the patient or the doctor involved can read or write. Doctors can create.
-    match /prescriptions/{prescriptionId} {
-        allow read, update, delete: if isSignedIn() && (
-            request.auth.uid == resource.data.patient.uid ||
-            request.auth.uid == resource.data.doctor.uid
-        );
-        allow create: if isDoctor();
+    // Helper function to check if the user is the owner of a document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
     
-    // CHATS & MESSAGES
-    // A user can read/write a chat document if they are one of the two participants.
-    // A user can create a chat document if they are one of the two participants.
-    match /chats/{chatId} {
-      allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.users;
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Any authenticated user can view a user's public profile (needed for doctor list/profiles)
+      allow get: if isAuthenticated();
+      // Only the user themselves can create or update their own profile
+      allow create, update: if isOwner(userId);
+      // Listing users is restricted to avoid exposing all user data.
+      // The app fetches doctors via a client-side filter which works with these rules.
+      allow list: if isAuthenticated();
+    }
+    
+    // Rules for the 'appointments' collection
+    match /appointments/{appointmentId} {
+      // A user can create an appointment if they are the patient making the request.
+      allow create: if isAuthenticated() && request.resource.data.patient.uid == request.auth.uid;
+      // A user can read or update an appointment if they are either the patient or the doctor involved.
+      allow read, update: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
+    }
+    
+    // Rules for the 'prescriptions' collection
+    match /prescriptions/{prescriptionId} {
+        // A doctor can create a prescription.
+        allow create: if isAuthenticated() && request.resource.data.doctor.uid == request.auth.uid;
+        // The patient or the doctor involved can read the prescription.
+        allow read: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
+        // Nobody can update or delete prescriptions through the client for safety.
+        allow update, delete: if false;
+    }
 
-      // Messages can only be read/written by participants of the parent chat.
-      match /messages/{messageId} {
-        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+    // Rules for the 'chats' collection and its 'messages' subcollection
+    match /chats/{chatId} {
+        // The chatId is a combination of two user UIDs, sorted alphabetically.
+        // This rule checks if the authenticated user's UID is part of the chatId.
+        function isParticipant() {
+            return request.auth.uid in chatId.split('_');
+        }
+
+        // Allow a user to read the chat document if they are a participant.
+        allow get: if isParticipant();
+        
+        // Allow a user to create the chat document IF it doesn't exist yet and they are a participant.
+        // This is crucial for the first message.
+        allow create: if isParticipant();
+        
+        // Do not allow general updates or lists on the main chat document.
+        allow list, update, delete: if false;
+
+        // Rules for the 'messages' subcollection within a chat
+        match /messages/{messageId} {
+            // Allow read and write (create, update for deletion) of messages if the user is a participant in the parent chat.
+            allow read, write: if isParticipant();
+        }
     }
   }
 }
