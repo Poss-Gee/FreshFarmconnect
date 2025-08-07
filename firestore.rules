@@ -1,0 +1,79 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Helper function to check if the user has the role of 'doctor'
+    function isDoctor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Anyone can create their own user document during signup
+      allow create: if isAuthenticated();
+      
+      // Any authenticated user can read public user profiles (e.g., to see a list of doctors)
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated();
+      
+      // Users can only update their own profile
+      allow update: if isAuthenticated() && isOwner(userId);
+      
+      // Users cannot delete their profiles through the app
+      allow delete: if false;
+    }
+
+    // Appointments collection
+    match /appointments/{appointmentId} {
+      // Patients can create appointments (request)
+      allow create: if isAuthenticated();
+      
+      // The patient or the doctor involved in the appointment can read/update it
+      allow read, update: if isAuthenticated() && (
+        isOwner(resource.data.patient.uid) || isOwner(resource.data.doctor.uid)
+      );
+      
+      // Only the patient who created it or the doctor can cancel (delete) it
+      // For this app, we update status to 'cancelled' instead of deleting
+      allow delete: if false; 
+    }
+
+    // Prescriptions collection
+    match /prescriptions/{prescriptionId} {
+        // Only doctors can create prescriptions
+        allow create: if isAuthenticated() && isDoctor();
+
+        // Only the patient or the doctor involved can read the prescription
+        allow read: if isAuthenticated() && (
+            isOwner(resource.data.patient.uid) || isOwner(resource.data.doctor.uid)
+        );
+
+        // Prescriptions are immutable
+        allow update, delete: if false;
+    }
+
+    // Chats collection and subcollections
+    match /chats/{chatId} {
+        // Allow read/write access to messages only if the user is part of the chat
+        // The chatId is structured as 'uid1_uid2' sorted alphabetically
+        allow read, write: if isAuthenticated() && request.auth.uid in split(chatId, '_');
+        
+        match /messages/{messageId} {
+             // Allow read/write access to messages only if the user is part of the chat
+            allow read, write, create: if isAuthenticated() && request.auth.uid in split(chatId, '_');
+        }
+    }
+  }
+}
