@@ -1,57 +1,59 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is the owner of a document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Users:
-    // - Any authenticated user can view public user profiles (e.g., for the doctors list).
-    // - Users can only create and update their own profile.
+    function isDoctor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
+    // USERS
+    // Users can be read by any authenticated user (to see doctor profiles)
+    // A user can only create/update/delete their own document.
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId);
+      allow read: if isSignedIn();
+      allow write: if isUser(userId);
     }
 
-    // Appointments:
-    // - Any authenticated user can create an appointment (request).
-    // - Only the patient or doctor involved can read, update, or delete an appointment.
+    // APPOINTMENTS
+    // Only the patient or the doctor involved in an appointment can read or write to it.
     match /appointments/{appointmentId} {
-      allow create: if isAuthenticated();
-      allow read, update, delete: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
+      allow read, write: if isSignedIn() && (
+        request.auth.uid == resource.data.patient.uid ||
+        request.auth.uid == resource.data.doctor.uid
+      );
+    }
+
+    // PRESCRIPTIONS
+    // Only the patient or the doctor involved can read or write. Doctors can create.
+    match /prescriptions/{prescriptionId} {
+        allow read, update, delete: if isSignedIn() && (
+            request.auth.uid == resource.data.patient.uid ||
+            request.auth.uid == resource.data.doctor.uid
+        );
+        allow create: if isDoctor();
     }
     
-    // Prescriptions:
-    // - Only a doctor can create a prescription.
-    // - Only the patient or doctor involved can read it.
-    match /prescriptions/{prescriptionId} {
-       allow create: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
-       allow read: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
-    }
-
-    // Chats:
-    // A chat document contains an array `users` with the two participant UIDs.
-    // - A chat can be created if the requesting user is one of the two participants.
-    // - Users can only read/write to chats they are a part of.
+    // CHATS & MESSAGES
+    // A user can read/write a chat document if they are one of the two participants.
+    // A user can create a chat document if they are one of the two participants.
     match /chats/{chatId} {
-      allow read, update, delete: if isAuthenticated() && request.auth.uid in resource.data.users;
-      // Allow creation of a chat document. The document ID is user1Id_user2Id.
-      // The `users` field in the request data must contain the authenticated user's UID.
-      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.users;
+      allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
 
-      // Messages:
-      // - Messages can only be created, read, or updated by participants of the parent chat.
+      // Messages can only be read/written by participants of the parent chat.
       match /messages/{messageId} {
-        // `get()` reads the parent chat document to verify permissions.
-        allow read, create, update, delete: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
       }
     }
   }
