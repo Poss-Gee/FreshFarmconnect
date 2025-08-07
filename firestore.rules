@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,71 +8,51 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is the owner of the document
+    // Helper function to check if the user is the owner of a document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    // Helper function to check if the user has the role of 'doctor'
-    function isDoctor() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
-    }
 
-    // Users collection
+    // Users:
+    // - Any authenticated user can view public user profiles (e.g., for the doctors list).
+    // - Users can only create and update their own profile.
     match /users/{userId} {
-      // Anyone can create their own user document during signup
-      allow create: if isAuthenticated();
-      
-      // Any authenticated user can read public user profiles (e.g., to see a list of doctors)
-      allow get: if isAuthenticated();
-      allow list: if isAuthenticated();
-      
-      // Users can only update their own profile
-      allow update: if isAuthenticated() && isOwner(userId);
-      
-      // Users cannot delete their profiles through the app
-      allow delete: if false;
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId);
     }
 
-    // Appointments collection
+    // Appointments:
+    // - Any authenticated user can create an appointment (request).
+    // - Only the patient or doctor involved can read, update, or delete an appointment.
     match /appointments/{appointmentId} {
-      // Patients can create appointments (request)
       allow create: if isAuthenticated();
-      
-      // The patient or the doctor involved in the appointment can read/update it
-      allow read, update: if isAuthenticated() && (
-        isOwner(resource.data.patient.uid) || isOwner(resource.data.doctor.uid)
-      );
-      
-      // Only the patient who created it or the doctor can cancel (delete) it
-      // For this app, we update status to 'cancelled' instead of deleting
-      allow delete: if false; 
+      allow read, update, delete: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
     }
-
-    // Prescriptions collection
+    
+    // Prescriptions:
+    // - Only a doctor can create a prescription.
+    // - Only the patient or doctor involved can read it.
     match /prescriptions/{prescriptionId} {
-        // Only doctors can create prescriptions
-        allow create: if isAuthenticated() && isDoctor();
-
-        // Only the patient or the doctor involved can read the prescription
-        allow read: if isAuthenticated() && (
-            isOwner(resource.data.patient.uid) || isOwner(resource.data.doctor.uid)
-        );
-
-        // Prescriptions are immutable
-        allow update, delete: if false;
+       allow create: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+       allow read: if isAuthenticated() && (request.auth.uid == resource.data.patient.uid || request.auth.uid == resource.data.doctor.uid);
     }
 
-    // Chats collection and subcollections
+    // Chats:
+    // A chat document contains an array `users` with the two participant UIDs.
+    // - A chat can be created if the requesting user is one of the two participants.
+    // - Users can only read/write to chats they are a part of.
     match /chats/{chatId} {
-        // Allow read/write access to messages only if the user is part of the chat
-        // The chatId is structured as 'uid1_uid2' sorted alphabetically
-        allow read, write: if isAuthenticated() && request.auth.uid in split(chatId, '_');
-        
-        match /messages/{messageId} {
-             // Allow read/write access to messages only if the user is part of the chat
-            allow read, write, create: if isAuthenticated() && request.auth.uid in split(chatId, '_');
-        }
+      allow read, update, delete: if isAuthenticated() && request.auth.uid in resource.data.users;
+      // Allow creation of a chat document. The document ID is user1Id_user2Id.
+      // The `users` field in the request data must contain the authenticated user's UID.
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.users;
+
+      // Messages:
+      // - Messages can only be created, read, or updated by participants of the parent chat.
+      match /messages/{messageId} {
+        // `get()` reads the parent chat document to verify permissions.
+        allow read, create, update, delete: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
     }
   }
 }
