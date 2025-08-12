@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'eClinic GH',
-  description: 'Your virtual link to healthcare in Ghana.',
+  title: 'HealthLink Hub',
+  description: 'Your virtual link to healthcare.',
   manifest: "/manifest.json",
 };
 
@@ -19,7 +19,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <meta name="theme-color" content="#D4AF37" />
+        <meta name="theme-color" content="#0B7BCB" />
       </head>
       <body className="font-body antialiased">
         {children}

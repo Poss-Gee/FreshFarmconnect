@@ -51,7 +51,7 @@ export default function AppSidebar() {
             className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
           >
             <Stethoscope className="h-5 w-5 transition-all group-hover:scale-110" />
-            <span className="sr-only">eClinic GH</span>
+            <span className="sr-only">HealthLink Hub</span>
           </Link>
           {navItems.map((item) => (
             <Tooltip key={item.href}>

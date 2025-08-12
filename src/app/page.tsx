@@ -34,7 +34,7 @@ export default function Home() {
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Stethoscope className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold">eClinic GH</h1>
+          <h1 className="text-2xl font-bold">HealthLink Hub</h1>
         </Link>
         <nav className="flex items-center gap-4">
           <Button variant="ghost" asChild>
@@ -50,10 +50,10 @@ export default function Home() {
         <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-4xl md:text-6xl font-headline font-bold tracking-tight">
-              Modern Healthcare for Ghana
+              Modern Healthcare for Everyone
             </h2>
             <p className="mt-6 text-lg text-muted-foreground">
-              Connect with top doctors, book appointments, and manage your health online with eClinic GH.
+              Connect with top doctors, book appointments, and manage your health online with HealthLink Hub.
               Accessible, reliable, and secure healthcare at your fingertips.
             </p>
             <div className="mt-8 flex justify-center gap-4">
@@ -114,7 +114,7 @@ export default function Home() {
                 Trusted by Professionals, Loved by Patients
               </h3>
               <p className="mt-4 text-muted-foreground">
-                eClinic GH is built on a foundation of trust and security. We partner with licensed medical professionals to ensure you receive the highest quality care.
+                HealthLink Hub is built on a foundation of trust and security. We partner with licensed medical professionals to ensure you receive the highest quality care.
               </p>
               <ul className="mt-6 space-y-4">
                 <li className="flex items-start gap-3">
@@ -144,7 +144,7 @@ export default function Home() {
 
       <footer className="bg-card border-t border-border/50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row justify-between items-center">
-          <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} eClinic GH. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} HealthLink Hub. All rights reserved.</p>
           <div className="flex gap-4 mt-4 sm:mt-0">
              <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary">Terms of Service</Link>
              <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary">Privacy Policy</Link>

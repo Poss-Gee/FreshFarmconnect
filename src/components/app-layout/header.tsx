@@ -85,7 +85,7 @@ export default function Header() {
             >
               <div className="flex items-center gap-2 text-foreground">
                 <Stethoscope className="h-6 w-6 text-primary" />
-                <span className="font-bold text-lg">eClinic GH</span>
+                <span className="font-bold text-lg">HealthLink Hub</span>
               </div>
             </Link>
             {navItems.map((item) => (

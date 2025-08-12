@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="absolute top-8 left-8">
         <Link href="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
           <Stethoscope className="h-6 w-6" />
-          <span className="text-xl font-bold">eClinic GH</span>
+          <span className="text-xl font-bold">HealthLink Hub</span>
         </Link>
       </div>
       <div className="w-full max-w-md">

@@ -9,7 +9,7 @@ export default function TermsOfServicePage() {
       <p>By using our application, you agree to be bound by these Terms of Service. If you do not agree to these Terms, do not use the application.</p>
 
       <h2>2. Medical Disclaimer</h2>
-      <p>eClinic GH is a platform that connects patients with healthcare providers. We do not provide medical advice, diagnosis, or treatment. The information and services provided through the application are not a substitute for professional medical advice. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.</p>
+      <p>HealthLink Hub is a platform that connects patients with healthcare providers. We do not provide medical advice, diagnosis, or treatment. The information and services provided through the application are not a substitute for professional medical advice. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.</p>
 
       <h2>3. User Accounts</h2>
       <p>When you create an account with us, you must provide us with information that is accurate, complete, and current at all times. Failure to do so constitutes a breach of the Terms, which may result in immediate termination of your account on our service.</p>
@@ -24,7 +24,7 @@ export default function TermsOfServicePage() {
       <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will provide at least 30 days' notice prior to any new terms taking effect.</p>
 
       <h2>7. Contact Us</h2>
-      <p>If you have any questions about these Terms, please contact us at: contact@eclinicgh.com</p>
+      <p>If you have any questions about these Terms, please contact us at: contact@healthlinkhub.com</p>
     </div>
   );
 }

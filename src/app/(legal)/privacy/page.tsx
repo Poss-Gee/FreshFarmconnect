@@ -6,7 +6,7 @@ export default function PrivacyPolicyPage() {
       <p>Last updated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
       
       <h2>1. Introduction</h2>
-      <p>Welcome to eClinic GH. We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.</p>
+      <p>Welcome to HealthLink Hub. We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.</p>
 
       <h2>2. Information We Collect</h2>
       <p>We may collect information about you in a variety of ways. The information we may collect via the Application includes:</p>
@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
       <p>We use administrative, technical, and physical security measures to help protect your personal information. While we have taken reasonable steps to secure the personal information you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable.</p>
 
       <h2>6. Contact Us</h2>
-      <p>If you have questions or comments about this Privacy Policy, please contact us at: contact@eclinicgh.com</p>
+      <p>If you have questions or comments about this Privacy Policy, please contact us at: contact@healthlinkhub.com</p>
     </div>
   );
 }
